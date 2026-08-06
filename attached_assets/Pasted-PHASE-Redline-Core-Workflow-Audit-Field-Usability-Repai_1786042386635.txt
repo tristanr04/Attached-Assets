@@ -1,0 +1,1158 @@
+PHASE: Redline Core Workflow Audit, Field Usability Repair, Pricing Validation, and Backtesting Readiness
+
+Objective:
+
+Temporarily stop adding broad enterprise modules.
+
+The current priority is to make Redline’s core product operate smoothly from beginning to end for an actual foreman using a phone.
+
+The primary product promise is:
+
+- Companies enter their own prices, charge sheets, work packages, equipment, labor classifications, and reporting templates.
+- Foremen do not repeatedly enter the same information.
+- Existing crew, project, equipment, pole, and billing information is reused automatically.
+- Foremen can copy prior work or select saved templates.
+- Foremen can photograph a pole and receive suggested pole attributes.
+- The system connects confirmed pole and work information to the company’s own billing rules.
+- The system identifies potentially missing or undercharged items.
+- Human review is required before anything becomes final billing.
+- Reports remain accurate, traceable, and isolated by company.
+
+Do not add unrelated modules during this phase.
+
+Do not rebuild functioning systems unnecessarily.
+
+Do not delete or reset existing data.
+
+==================================================
+1. CREATE A COMPLETE PRODUCT AUDIT
+==================================================
+
+Create a repository document named:
+
+REDLINE_PRODUCT_AUDIT.md
+
+Audit every existing feature and classify it as:
+
+- Fully working
+- Partially working
+- UI only
+- Backend only
+- Mocked
+- Broken
+- Missing
+- Blocked by external integration
+- Unreachable through navigation
+
+For every feature record:
+
+- Feature name
+- User role
+- Page or route
+- API endpoint
+- Database model
+- Current behavior
+- Expected behavior
+- Problem discovered
+- Required repair
+- Test coverage
+- Final status
+
+Audit at minimum:
+
+- Registration
+- Login
+- Company creation
+- Company invitation
+- Company switching
+- User roles
+- Customer creation
+- Contract creation
+- Project creation
+- Crew creation
+- Employee creation
+- Labor classifications
+- Equipment catalog
+- Equipment rates
+- Charge sheets
+- Billing codes
+- Work-package templates
+- Pole templates
+- Crew templates
+- Copy-yesterday workflow
+- Daily report creation
+- Photo capture
+- Photo upload
+- Pole-photo analysis
+- Labor entry
+- Equipment entry
+- Material entry
+- Billing calculation
+- Missing-charge detection
+- Undercharge detection
+- Draft autosave
+- Report reopening
+- Foreman submission
+- Supervisor review
+- Billing review
+- Approval
+- Report locking
+- PDF or printable output
+- Audit history
+- Mobile layouts
+- Company-data isolation
+
+Do not classify anything as fully working until it is tested through the visible user interface.
+
+==================================================
+2. DEFINE THE CORE FOREMAN WORKFLOW
+==================================================
+
+Build and verify this exact workflow:
+
+1. Foreman signs in.
+2. Foreman sees today’s assigned project and crew.
+3. Foreman taps “Start Today’s Report.”
+4. The app offers:
+   - Use crew defaults
+   - Copy yesterday
+   - Copy a previous report
+   - Use a work-package template
+   - Start blank
+5. Existing company, customer, contract, project, crew, and common equipment are prefilled.
+6. Foreman confirms or changes crew members.
+7. Foreman confirms or changes equipment.
+8. Foreman selects the work performed.
+9. Foreman may take or upload pole photos.
+10. The system saves the photos.
+11. The system may analyze the photos when a real vision provider is configured.
+12. The foreman confirms pole characteristics and work performed.
+13. The app loads the matching company template.
+14. The app loads expected labor, equipment, materials, and billing codes.
+15. Foreman changes only what was different.
+16. The app detects potentially missing charges.
+17. The app detects possible undercharging.
+18. Foreman reviews all warnings.
+19. Foreman saves or submits the report.
+20. Supervisor reviews it.
+21. Billing reviewer reviews pricing.
+22. Approved report becomes locked.
+23. Final report can be printed or exported.
+
+Repair every point where this flow:
+
+- Dead ends
+- Requires hidden navigation
+- Loses data
+- Shows stale data
+- Uses demo data unexpectedly
+- Fails silently
+- Requires unnecessary re-entry
+- Breaks on mobile
+- Produces inconsistent totals
+
+==================================================
+3. REBUILD THE FOREMAN HOME SCREEN
+==================================================
+
+Create a simple field-facing home screen.
+
+Primary actions:
+
+- Start Today’s Report
+- Continue Draft
+- Copy Yesterday
+- Take Pole Photo
+- View Returned Reports
+- View Recent Reports
+
+Show:
+
+- Current company
+- Current crew
+- Current project
+- Today’s assignment
+- Default equipment
+- Reports awaiting completion
+- Reports returned for correction
+
+Do not clutter the foreman home screen with executive, accounting, fleet, inventory, or SaaS-administration controls.
+
+Users should see only actions relevant to their role.
+
+==================================================
+4. REPAIR MOBILE NAVIGATION
+==================================================
+
+Create role-specific navigation.
+
+Foreman navigation:
+
+- Home
+- Reports
+- Camera
+- Crew
+- More
+
+Supervisor navigation:
+
+- Home
+- Reviews
+- Crews
+- Reports
+- More
+
+Billing navigation:
+
+- Home
+- Billing Review
+- Charge Sheets
+- Reports
+- More
+
+Administrator navigation:
+
+- Dashboard
+- Company Setup
+- Pricing
+- Templates
+- Users
+- More
+
+Ensure every important feature is reachable within three taps.
+
+Remove duplicate or confusing menu items.
+
+Do not expose administrative pricing controls to unauthorized foremen.
+
+==================================================
+5. MOBILE SCREEN AUDIT
+==================================================
+
+Audit every core screen at:
+
+- 320px
+- 375px
+- 390px
+- 430px
+- Tablet
+- Desktop
+
+Requirements:
+
+- No horizontal scrolling
+- No clipped buttons
+- No buttons hidden below fixed navigation
+- No forms wider than the screen
+- No modal wider than the viewport
+- No keyboard-covered fields
+- Large tap targets
+- Numeric keyboards for quantities and hours
+- Searchable dropdowns
+- Outdoor-readable contrast
+- Sticky save and continue actions
+- Safe-area support
+- One-handed use where practical
+
+Specifically test:
+
+- Company onboarding
+- Foreman home
+- Start-report screen
+- Copy-yesterday flow
+- Crew selection
+- Equipment selection
+- Photo capture
+- Photo preview
+- Pole review
+- Billing warnings
+- Report submission
+- Correction workflow
+
+==================================================
+6. WORKING PHOTO CAPTURE
+==================================================
+
+Verify that a visible button labeled:
+
+“Take Pole Photo”
+
+exists on:
+
+- Foreman home
+- Daily report
+- Work-package selection
+- Pole identification section
+- Photo evidence section
+
+Also provide:
+
+“Upload Existing Photo”
+
+The working flow must be:
+
+1. Tap Take Pole Photo.
+2. Device camera opens when supported.
+3. User takes photo.
+4. Preview appears.
+5. User selects:
+   - Use Photo
+   - Retake
+   - Cancel
+6. Accepted photo uploads.
+7. Upload progress appears.
+8. Photo displays in the report.
+9. Photo persists after refresh and sign-in.
+10. Multiple photos may be added.
+
+Use mobile-compatible camera input behavior such as:
+
+- accept="image/*"
+- capture="environment"
+
+Provide a photo-library fallback.
+
+Do not consider this complete if only a hidden file input or backend route exists.
+
+==================================================
+7. PHOTO CATEGORIES
+==================================================
+
+Support:
+
+- Full pole
+- Pole tag or stamp
+- Pole top and framing
+- Transformer or equipment
+- Pole base
+- Damage
+- Before work
+- During work
+- After work
+- Other
+
+Each photo must support:
+
+- Category
+- Caption
+- Timestamp
+- Upload status
+- User
+- Project
+- Report
+- Work order
+- Company
+- Thumbnail
+- Authorized full-image access
+
+Allow required photo categories to be configured by work-package template.
+
+==================================================
+8. PHOTO ANALYSIS STATUS
+==================================================
+
+After a saved photo, display:
+
+“Analyze Pole Photo”
+
+When a real vision provider is configured:
+
+- Submit the saved image for analysis.
+- Show processing progress.
+- Return structured suggestions.
+- Require user confirmation.
+
+When no provider is configured:
+
+Display:
+
+“Photo saved. Automated pole analysis is not configured yet.”
+
+Do not generate fake results.
+
+Photo capture and normal report completion must still work without AI analysis.
+
+==================================================
+9. STRUCTURED POLE REVIEW
+==================================================
+
+Create a review screen with fields such as:
+
+- Pole material
+- Estimated height
+- Pole class
+- Pole tag
+- Pole number
+- Utility marking
+- Structure type
+- Crossarm count
+- Transformer present
+- Transformer configuration
+- Number of phases
+- Guy wire present
+- Anchor present
+- Equipment attached
+- Visible damage
+- Access type
+- Backyard access
+- Roadside access
+- Notes
+
+Every field should support:
+
+- Suggested value
+- Confidence
+- User-confirmed value
+- User correction
+- Manual entry
+- Unknown or unable to determine
+
+Never state that hidden or non-visible pole characteristics are known with certainty.
+
+==================================================
+10. COMPANY PRICING SETUP
+==================================================
+
+Repair and simplify the company pricing center.
+
+Company administrators must be able to:
+
+- Create a charge sheet manually
+- Import CSV
+- Import XLSX
+- Map spreadsheet columns
+- Preview imported rows
+- Correct invalid rows
+- Detect duplicates
+- Activate a rate-sheet version
+- Archive old versions
+- Copy a rate sheet
+- Add customer-specific pricing
+- Add contract-specific pricing
+- Add project-specific overrides
+
+Support pricing for:
+
+- Labor
+- Foreman
+- Journeyman
+- Apprentice
+- Operator
+- Groundman
+- Regular time
+- Overtime
+- Double time
+- Storm work
+- Per diem
+- Travel
+- Bucket truck
+- Digger derrick
+- Backyard machine
+- Crane
+- Excavator
+- Trailers
+- Mobilization
+- Demobilization
+- Standby
+- Pole work
+- Transformer work
+- Guying
+- Anchors
+- Conductor
+- Materials
+- Custom items
+
+Each item should include:
+
+- Billing code
+- Description
+- Category
+- Unit type
+- Rate
+- Effective date
+- Expiration date
+- Customer
+- Contract
+- Active status
+
+Never hard-code one contractor’s real prices into the shared application.
+
+==================================================
+11. PRICING PRECEDENCE
+==================================================
+
+Use one documented pricing-precedence system:
+
+1. Authorized report-specific override
+2. Project-specific rate
+3. Customer-contract rate
+4. Active charge-sheet rate
+5. Company default rate
+
+For every calculated item display internally:
+
+- Selected rate
+- Rate source
+- Charge-sheet version
+- Effective date
+- Quantity
+- Unit type
+- Extended amount
+
+If two rates conflict at equal priority:
+
+- Do not silently select one.
+- Flag the conflict.
+- Require review.
+
+==================================================
+12. COMPANY TEMPLATE SETUP
+==================================================
+
+Company administrators must be able to create reusable templates for:
+
+- Crew setup
+- Equipment setup
+- Pole type
+- Pole replacement
+- Pole removal
+- Transformer changeout
+- Anchor installation
+- Guy installation
+- Framing
+- Service transfer
+- Storm work
+- New construction
+- Reconductoring
+- Backyard access
+- Custom work
+
+Each template may include:
+
+- Customer
+- Contract
+- Pole characteristics
+- Work description
+- Default crew
+- Default labor classifications
+- Default equipment
+- Default materials
+- Default billing codes
+- Required billing codes
+- Optional add-ons
+- Default quantities
+- Minimum quantities
+- Required photos
+- Required forms
+- Required signatures
+- Validation rules
+- Default notes
+- Effective date
+- Version
+- Active status
+
+Provide:
+
+- Create
+- Edit draft
+- Duplicate
+- Preview
+- Activate
+- Archive
+- Restore as new version
+
+Do not alter reports that used an older template version.
+
+==================================================
+13. FAST TEMPLATE SELECTION
+==================================================
+
+On report creation, show:
+
+- Recently Used
+- Crew Favorites
+- Project Defaults
+- Customer Templates
+- Search All Templates
+- Suggested From Pole Photo
+- Start Blank
+
+Use large mobile-friendly cards.
+
+The user should not need to search hundreds of templates every day.
+
+Allow the foreman to favorite common templates.
+
+==================================================
+14. COPY-YESTERDAY WORKFLOW
+==================================================
+
+Repair and verify “Copy Yesterday.”
+
+When used:
+
+- Create a new independent report.
+- Preserve the original.
+- Update the report date.
+- Remove prior signatures.
+- Reset approval statuses.
+- Reset submission timestamps.
+- Mark copied quantities for confirmation.
+- Carry forward crew and equipment.
+- Carry forward work package when requested.
+- Recalculate using rates effective for the new date.
+- Re-run billing rules.
+- Warn when rates or templates changed.
+
+Offer separate options:
+
+- Copy crew only
+- Copy crew and equipment
+- Copy entire report
+- Copy selected sections
+
+==================================================
+15. EQUIPMENT QUICK SELECT
+==================================================
+
+Create a mobile equipment selector with:
+
+- Crew defaults
+- Yesterday’s equipment
+- Recent equipment
+- Favorites
+- Search
+- Category filters
+- Large selection cards
+- Multi-select
+- Quantity
+- Active hours
+- Standby hours
+- Mobilization
+- Demobilization
+
+Support multiple entries such as:
+
+- Bucket Truck 12
+- Digger Derrick 7
+- Backyard Machine 2
+- Pole Trailer 3
+- Material Trailer 8
+
+Foremen should not need to re-enter equipment rates.
+
+==================================================
+16. LABOR QUICK ENTRY
+==================================================
+
+Create fast labor entry.
+
+Allow:
+
+- Use crew defaults
+- Copy yesterday’s hours
+- Apply the same hours to multiple workers
+- Change one employee
+- Add temporary worker
+- Select classification
+- Regular hours
+- Overtime hours
+- Double-time hours
+- Travel hours
+- Per diem
+
+Rates should come from company configuration.
+
+Employee wages and customer billing rates must remain separate.
+
+==================================================
+17. BILLING RULE VALIDATION
+==================================================
+
+Run billing validation using confirmed report data.
+
+Flag examples:
+
+- Pole replacement selected without installation charge
+- Existing pole removal missing
+- Disposal charge missing
+- Digger derrick selected without equipment billing
+- Bucket truck selected without equipment billing
+- Backyard machine selected without specialty charge
+- Equipment hours missing
+- Mobilization missing
+- Labor classification missing
+- Overtime billed at regular rate
+- Double-time billed incorrectly
+- Storm work missing storm rate
+- Required minimum quantity not met
+- Expired rate selected
+- Wrong customer rate sheet
+- Required photo missing
+- Required form missing
+- Template conflict with pole attributes
+
+Warnings should show:
+
+- What may be wrong
+- Why it was flagged
+- Current value
+- Expected configured value
+- Potential difference
+- Suggested action
+- Review requirement
+
+Use the label:
+
+“Potential billing difference — requires review.”
+
+==================================================
+18. REPORT TOTALS
+==================================================
+
+Create one shared report calculation service.
+
+Calculate:
+
+- Regular labor
+- Overtime labor
+- Double-time labor
+- Travel
+- Per diem
+- Equipment
+- Standby
+- Mobilization
+- Demobilization
+- Materials
+- Work units
+- Add-ons
+- Credits
+- Estimated total
+- Potential missing billing
+- Potential undercharge
+- Reviewed total
+- Approved total
+
+All pages must use the same calculation logic.
+
+Remove duplicate and conflicting total calculations.
+
+==================================================
+19. ROLE-BASED PRICE VISIBILITY
+==================================================
+
+Allow company administrators to configure whether foremen can see:
+
+- Billing codes
+- Unit rates
+- Extended totals
+- Report total
+- Undercharge amount
+
+Foremen may still receive operational warnings without seeing private pricing.
+
+Supervisors and billing users should see only information allowed by their roles.
+
+Enforce permissions server-side.
+
+==================================================
+20. DRAFT AUTOSAVE
+==================================================
+
+Verify autosave for:
+
+- Crew
+- Labor
+- Equipment
+- Materials
+- Work package
+- Pole fields
+- Photos
+- Notes
+- Billing items
+- Forms
+
+Display:
+
+- Saving
+- Saved
+- Save failed
+- Draft restored
+
+Do not lose report progress when:
+
+- User refreshes
+- Browser closes
+- Connection fails
+- Camera opens
+- Image upload fails
+- Recognition times out
+
+==================================================
+21. ERROR HANDLING
+==================================================
+
+Fix all silent failures.
+
+Every failure should show:
+
+- What happened
+- Whether current data was preserved
+- What the user can do next
+- Retry option where appropriate
+
+Handle:
+
+- Database failure
+- Network failure
+- Upload failure
+- Camera denial
+- Vision failure
+- Pricing conflict
+- Invalid quantity
+- Expired session
+- Permission denial
+- Duplicate submission
+- Template loading failure
+- Report submission failure
+
+==================================================
+22. LOADING STATES
+==================================================
+
+Add visible states for:
+
+- Loading assignment
+- Copying report
+- Loading template
+- Uploading photo
+- Analyzing photo
+- Calculating charges
+- Saving draft
+- Running validation
+- Submitting report
+- Approving report
+- Generating PDF
+
+Prevent users from submitting the same action multiple times.
+
+==================================================
+23. REPORT REVIEW FLOW
+==================================================
+
+Foreman review should show:
+
+- Crew
+- Labor
+- Equipment
+- Work performed
+- Pole information
+- Materials
+- Photos
+- Forms
+- Billing items when permitted
+- Warnings
+- Missing requirements
+
+Supervisor review should show:
+
+- Work details
+- Quantities
+- Evidence
+- Corrections
+- Operational warnings
+
+Billing review should show:
+
+- Charge sheet
+- Billing codes
+- Quantities
+- Rates
+- Price sources
+- Potential differences
+- Overrides
+- Audit history
+
+==================================================
+24. APPROVAL AND LOCKING
+==================================================
+
+Verify statuses:
+
+- Draft
+- Foreman review
+- Submitted
+- Needs correction
+- Supervisor approved
+- Billing review
+- Billing approved
+- Finalized
+- Archived
+
+Once finalized:
+
+- Lock report data.
+- Lock pricing version.
+- Lock template version.
+- Lock photo evidence.
+- Preserve all signatures.
+- Require an amendment for changes.
+
+==================================================
+25. PDF AND PRINT OUTPUT
+==================================================
+
+Generate a professional report containing:
+
+- Company
+- Customer
+- Contract
+- Project
+- Work order
+- Date
+- Foreman
+- Crew
+- Labor
+- Equipment
+- Work performed
+- Pole information
+- Materials
+- Photos
+- Required forms
+- Signatures
+- Billing summary when authorized
+- Approval history
+
+Customer-facing output must not expose:
+
+- Employee wages
+- Internal equipment costs
+- Internal margin
+- Private notes
+- Other customer data
+
+==================================================
+26. SECURITY AND COMPANY ISOLATION
+==================================================
+
+Create automated tests proving Company A cannot access Company B’s:
+
+- Users
+- Crews
+- Employees
+- Projects
+- Reports
+- Photos
+- Charge sheets
+- Prices
+- Equipment
+- Templates
+- Billing rules
+- Exports
+- Audit history
+
+Verify all protection server-side.
+
+Do not rely only on hidden buttons.
+
+==================================================
+27. BACKTEST DATA GENERATOR
+==================================================
+
+Create fictional test scenarios for backtesting.
+
+Include:
+
+1. Standard pole replacement
+2. Backyard pole replacement
+3. Pole replacement with transformer
+4. Three-phase bank changeout
+5. Storm pole replacement
+6. Equipment-only work
+7. T&M work
+8. Work with missing digger charge
+9. Work with missing mobilization
+10. Overtime billed as regular time
+11. Double time billed as overtime
+12. Expired charge sheet
+13. Incorrect customer contract
+14. Copied report with changed rate
+15. Report with missing required photo
+16. Report with low-confidence pole analysis
+17. Report completed manually after AI failure
+
+Use fictional pricing only.
+
+==================================================
+28. BACKTESTING DASHBOARD
+==================================================
+
+Create an internal testing screen available only to authorized demo or development users.
+
+Allow selecting a fictional scenario and running:
+
+- Template loading
+- Rate selection
+- Billing calculations
+- Missing-charge detection
+- Undercharge detection
+- Permission checks
+- Report submission
+- Approval flow
+
+Display:
+
+- Expected result
+- Actual result
+- Passed or failed
+- Difference
+- Rule fired
+- Rate source
+- Error details
+
+Do not expose this dashboard to ordinary production users.
+
+==================================================
+29. AUTOMATED TESTING
+==================================================
+
+Add tests for:
+
+- Registration
+- Company creation
+- Invitation
+- Role permissions
+- Charge-sheet entry
+- CSV import
+- XLSX import
+- Template creation
+- Template versioning
+- Copy yesterday
+- Crew defaults
+- Equipment defaults
+- Labor entry
+- Equipment entry
+- Photo capture component
+- Photo upload
+- Photo persistence
+- Vision-provider absence
+- Recognition result review
+- Pricing precedence
+- Billing calculations
+- Missing-charge detection
+- Undercharge detection
+- Draft autosave
+- Submission
+- Correction workflow
+- Approval
+- Report locking
+- Amendments
+- PDF generation
+- Mobile rendering
+- Cross-company isolation
+
+Do not skip or weaken failing tests merely to obtain a passing result.
+
+==================================================
+30. MANUAL FIELD TEST SCRIPT
+==================================================
+
+Create:
+
+REDLINE_FIELD_TEST.md
+
+Include this exact manual test:
+
+1. Create a fictional company.
+2. Enter a fictional customer.
+3. Enter a fictional contract.
+4. Import a fictional charge sheet.
+5. Create a pole-replacement template.
+6. Add crew defaults.
+7. Add bucket truck, digger derrick, and backyard machine.
+8. Sign in as foreman.
+9. Start today’s report.
+10. Use crew defaults.
+11. Take a pole photo.
+12. Preview and accept the photo.
+13. Confirm photo persists.
+14. Run analysis if configured.
+15. Confirm or manually enter pole information.
+16. Select the work package.
+17. Confirm labor.
+18. Confirm equipment.
+19. Remove one required billing item intentionally.
+20. Verify warning appears.
+21. Restore the item.
+22. Save draft.
+23. Close and reopen.
+24. Verify all information remains.
+25. Submit.
+26. Review as supervisor.
+27. Review as billing user.
+28. Approve.
+29. Generate the final report.
+30. Verify a second company cannot access any record.
+
+Document expected and actual results.
+
+==================================================
+COMPLETION REQUIREMENTS
+==================================================
+
+Do not stop after creating audit documents, UI placeholders, or backend models.
+
+Deliver working:
+
+- Complete product audit
+- Role-specific navigation
+- Foreman home screen
+- Smooth start-to-finish report flow
+- Mobile repairs
+- Working camera capture
+- Photo persistence
+- Honest vision-provider status
+- Company pricing setup
+- Charge-sheet import
+- Pricing precedence
+- Company templates
+- Copy-yesterday workflow
+- Crew and equipment defaults
+- Labor quick entry
+- Equipment quick select
+- Shared billing calculations
+- Missing-charge detection
+- Undercharge detection
+- Draft autosave
+- Visible errors
+- Approval workflow
+- Report locking
+- PDF output
+- Company-isolation tests
+- Backtesting scenarios
+- Backtesting dashboard
+- Manual field-test script
+
+At completion, provide:
+
+1. Features audited
+2. Broken features discovered
+3. Broken features repaired
+4. Features still mocked
+5. Features blocked by external services
+6. Photo-capture status
+7. Pole-analysis status
+8. Company-pricing status
+9. Template-system status
+10. Billing-calculation status
+11. Mobile problems fixed
+12. Database migrations
+13. Security improvements
+14. Automated tests run and results
+15. Manual tests completed
+16. Known limitations
+17. Exact instructions for beginning live foreman testing
+
+Primary success condition:
+
+A contractor administrator can enter company-specific rates and reusable templates, and a foreman can complete a full mobile report using saved crew and equipment data, take and save pole photos, confirm pole and work information, receive company-specific billing suggestions and warnings, submit the report, and have it reviewed without repeatedly entering information the system already knows.
