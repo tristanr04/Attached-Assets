@@ -1,0 +1,1071 @@
+PHASE: Production Tracking, Job Costing, Invoice Preparation, and Executive Reporting
+
+Objective:
+
+Extend the application from field reporting and billing validation into a complete production and job-costing platform.
+
+The app must allow contractors to compare:
+
+- Work completed
+- Work billed
+- Labor used
+- Equipment used
+- Materials used
+- Estimated revenue
+- Estimated cost
+- Gross margin
+- Missing production
+- Unapproved billing
+- Project performance
+
+The system should help foremen, supervisors, billing staff, project managers, and company leadership understand whether work is being documented, charged, reviewed, and prepared for invoicing correctly.
+
+Do not remove, rebuild, or break existing:
+
+- Authentication
+- Company onboarding
+- Company isolation
+- Crews
+- Employees
+- Projects
+- Daily reports
+- Labor entries
+- Equipment entries
+- Material entries
+- Work-package templates
+- Charge sheets
+- Billing rules
+- Missing-charge detection
+- Undercharge detection
+- Approval workflows
+- Audit history
+- Mobile responsiveness
+- Existing user data
+
+Before implementation:
+
+1. Inspect the current codebase and database schema.
+2. Identify existing models that can be extended.
+3. Reuse existing business logic.
+4. Create safe database migrations.
+5. Preserve all historical reports and charge-sheet versions.
+6. Run the existing test suite.
+7. Fix existing blocking bugs before adding new features.
+
+==================================================
+1. PROJECT PRODUCTION TRACKING
+==================================================
+
+Create a production-tracking system for each project.
+
+Track:
+
+- Project
+- Customer
+- Contract
+- Crew
+- Foreman
+- Date
+- Work package
+- Billing code
+- Unit type
+- Planned quantity
+- Completed quantity
+- Approved quantity
+- Billed quantity
+- Remaining quantity
+- Rejected quantity
+- Corrected quantity
+- Unit rate
+- Estimated revenue
+- Approved revenue
+- Invoice status
+- Notes
+
+Production records should be created from approved daily reports.
+
+Do not count unapproved report items as final production.
+
+Clearly distinguish:
+
+- Reported production
+- Supervisor-approved production
+- Billing-approved production
+- Invoiced production
+- Paid production
+
+==================================================
+2. CONTRACT QUANTITY SCHEDULES
+==================================================
+
+Allow company administrators and project managers to upload or manually enter contract quantities.
+
+Support:
+
+- CSV
+- XLSX
+- Manual entry
+
+Each contract quantity item should include:
+
+- Billing code
+- Description
+- Contract quantity
+- Unit type
+- Unit rate
+- Original contract value
+- Approved change-order quantity
+- Approved change-order value
+- Revised contract quantity
+- Revised contract value
+- Completed quantity
+- Remaining quantity
+- Percent complete
+- Invoiced quantity
+- Paid quantity
+
+Allow saved import mappings.
+
+Validate imported codes against the active charge sheet.
+
+Flag:
+
+- Unknown billing codes
+- Duplicate line items
+- Unit-type conflicts
+- Rate conflicts
+- Missing quantities
+- Invalid values
+
+==================================================
+3. DAILY PRODUCTION SUMMARY
+==================================================
+
+Create a daily production summary for each crew and project.
+
+Display:
+
+- Work packages completed
+- Units completed
+- Labor hours
+- Equipment hours
+- Materials used
+- Estimated billable revenue
+- Approved revenue
+- Potential missing charges
+- Potential undercharges
+- Reports awaiting approval
+- Photos and documentation status
+- Incidents or delays
+
+Allow filtering by:
+
+- Date
+- Project
+- Crew
+- Foreman
+- Work package
+- Billing code
+- Approval status
+
+==================================================
+4. WEEKLY PRODUCTION REPORT
+==================================================
+
+Create an automated weekly production report.
+
+Include:
+
+- Units completed by billing code
+- Revenue by work package
+- Labor hours
+- Equipment utilization
+- Material usage
+- Production by crew
+- Production by foreman
+- Missing reports
+- Reports needing correction
+- Potential billing differences
+- Approved added billing
+- Project percent complete
+- Remaining contract quantities
+
+Allow PDF and spreadsheet export.
+
+Clearly label estimated and unapproved values.
+
+==================================================
+5. JOB COSTING
+==================================================
+
+Build a company-configurable job-costing system.
+
+Track estimated and actual costs for:
+
+- Labor
+- Payroll burden
+- Equipment
+- Fuel
+- Materials
+- Subcontractors
+- Lodging
+- Per diem
+- Travel
+- Mobilization
+- Demobilization
+- Traffic control
+- Permits
+- Disposal
+- Other project expenses
+
+Each cost record should support:
+
+- Project
+- Crew
+- Date
+- Cost category
+- Cost code
+- Description
+- Quantity
+- Unit cost
+- Total cost
+- Source
+- Confirmed status
+- Receipt or document
+- Created by
+- Approved by
+
+Do not assume billing rates equal company costs.
+
+Keep separate concepts for:
+
+- Employee wage
+- Loaded labor cost
+- Customer billing rate
+- Equipment internal cost
+- Equipment billing rate
+- Material cost
+- Material markup
+- Billable revenue
+
+==================================================
+6. LABOR COST CONFIGURATION
+==================================================
+
+Allow authorized administrators to configure internal labor costs.
+
+Each labor classification should support:
+
+- Base wage
+- Overtime wage
+- Double-time wage
+- Payroll tax burden
+- Workers’ compensation burden
+- Benefits burden
+- Pension contribution
+- Insurance cost
+- Other burden
+- Loaded regular cost
+- Loaded overtime cost
+- Loaded double-time cost
+- Effective date
+
+Restrict wage and internal cost visibility to authorized roles.
+
+Foremen should not automatically see private wage data.
+
+Use the correct effective cost based on the work date.
+
+==================================================
+7. EQUIPMENT INTERNAL COSTS
+==================================================
+
+Allow administrators to configure internal equipment costs separately from billing rates.
+
+Support:
+
+- Ownership cost
+- Lease cost
+- Fuel cost
+- Maintenance reserve
+- Insurance
+- Operator cost if included
+- Hourly internal cost
+- Daily internal cost
+- Standby internal cost
+- Mobilization cost
+- Depreciation estimate
+- Effective date
+
+Calculate:
+
+- Equipment cost
+- Equipment revenue
+- Equipment gross margin
+- Utilization rate
+
+==================================================
+8. MATERIAL COST AND MARKUP
+==================================================
+
+Create a material-cost catalog.
+
+Each material should support:
+
+- Material code
+- Name
+- Description
+- Vendor
+- Unit type
+- Current cost
+- Customer billing rate
+- Markup percentage
+- Effective date
+- Customer-provided status
+- Taxable status
+- Active status
+
+Track material usage on reports.
+
+Calculate:
+
+- Material cost
+- Material billing
+- Material markup
+- Material gross margin
+
+Do not bill customer-provided materials unless a configured rule allows a handling or installation charge.
+
+==================================================
+9. ESTIMATED PROJECT REVENUE
+==================================================
+
+Calculate project revenue using approved production and applicable charge-sheet rates.
+
+Show:
+
+- Original contract value
+- Approved change-order value
+- Revised contract value
+- Reported revenue
+- Approved revenue
+- Invoiced revenue
+- Paid revenue
+- Remaining contract value
+- Potential missing billing
+- Potential undercharge
+- Revenue awaiting approval
+
+Clearly distinguish estimates from finalized amounts.
+
+==================================================
+10. GROSS MARGIN TRACKING
+==================================================
+
+Create gross-margin reporting.
+
+Calculate:
+
+Estimated gross margin =
+Approved or estimated revenue
+minus labor cost
+minus equipment cost
+minus material cost
+minus other direct project costs
+
+Show:
+
+- Revenue
+- Direct cost
+- Gross profit
+- Gross-margin percentage
+- Margin by project
+- Margin by crew
+- Margin by work package
+- Margin by billing code
+- Margin by customer
+- Margin by date range
+
+Do not present profit as final accounting income.
+
+Label it:
+
+“Operational gross-margin estimate”
+
+==================================================
+11. PRODUCTION VERSUS PLAN
+==================================================
+
+Allow project managers to create production plans.
+
+Each plan should support:
+
+- Project
+- Work package
+- Billing code
+- Planned quantity
+- Planned start date
+- Planned completion date
+- Planned crew
+- Planned daily production
+- Planned labor hours
+- Planned equipment hours
+- Planned cost
+- Planned revenue
+
+Compare actual results against plan.
+
+Display:
+
+- Planned quantity
+- Actual quantity
+- Variance
+- Planned revenue
+- Actual estimated revenue
+- Planned cost
+- Actual estimated cost
+- Schedule variance
+- Productivity variance
+- Margin variance
+
+==================================================
+12. CREW PRODUCTIVITY
+==================================================
+
+Create productivity metrics.
+
+Examples:
+
+- Poles installed per crew day
+- Units completed per labor hour
+- Revenue per crew day
+- Revenue per labor hour
+- Labor hours per work package
+- Equipment hours per unit
+- Average completion time
+- Rework rate
+- Correction rate
+- Report completion time
+
+Allow companies to create custom productivity metrics.
+
+Do not rank employees publicly by default.
+
+Restrict sensitive performance information to authorized roles.
+
+==================================================
+13. REPORT-TO-PRODUCTION RECONCILIATION
+==================================================
+
+Build reconciliation checks between field reports and project production.
+
+Flag:
+
+- Approved report not included in production
+- Production entered without an approved report
+- Quantity mismatch
+- Billing-code mismatch
+- Duplicate production
+- Report copied with unchanged quantities
+- Work package quantity inconsistent with billing items
+- Equipment usage inconsistent with production
+- Labor hours inconsistent with reported work
+- Production exceeding remaining contract quantity
+
+Each issue should include:
+
+- Source report
+- Project
+- Billing code
+- Reported quantity
+- Production quantity
+- Difference
+- Suggested review action
+
+==================================================
+14. INVOICE PREPARATION
+==================================================
+
+Create an invoice-preparation workspace.
+
+This phase should prepare invoice data but should not transmit invoices to customers unless a real accounting integration already exists.
+
+Allow billing staff to:
+
+- Select a project
+- Choose approved date range
+- Review approved production
+- Review billing codes
+- Review quantities
+- Review rates
+- Review supporting reports
+- Review photos
+- Review required documentation
+- Resolve warnings
+- Group invoice line items
+- Add authorized adjustments
+- Generate invoice backup package
+- Mark production as invoice-ready
+
+Invoice statuses:
+
+- Not ready
+- Needs correction
+- Ready for billing
+- Invoice draft
+- Submitted externally
+- Customer rejected
+- Customer approved
+- Paid
+- Partially paid
+
+==================================================
+15. INVOICE BACKUP PACKAGE
+==================================================
+
+Generate a professional backup package containing:
+
+- Customer
+- Contract
+- Project
+- Billing period
+- Invoice reference
+- Line-item summary
+- Billing codes
+- Quantities
+- Rates
+- Extended amounts
+- Daily reports
+- Foreman signatures
+- Supervisor approvals
+- Required photos
+- Equipment records
+- Material records
+- Safety documentation
+- Change orders
+- Exceptions and explanations
+
+Allow:
+
+- PDF export
+- ZIP-style document package when supported
+- Spreadsheet export
+- Document checklist
+
+Do not expose internal costs or margins in customer-facing exports.
+
+==================================================
+16. CHANGE ORDERS
+==================================================
+
+Create a change-order module.
+
+Each change order should support:
+
+- Project
+- Customer
+- Contract
+- Change-order number
+- Title
+- Description
+- Requested date
+- Approval date
+- Status
+- Added quantity
+- Added work items
+- Added rates
+- Added contract value
+- Supporting documents
+- Submitted by
+- Approved by
+- Notes
+
+Statuses:
+
+- Draft
+- Internal review
+- Submitted to customer
+- Approved
+- Rejected
+- Partially approved
+- Cancelled
+
+Approved change orders should update revised contract quantities and values without overwriting the original contract.
+
+==================================================
+17. T&M WORKFLOW
+==================================================
+
+Create a time-and-material workflow for work billed outside normal unit pricing.
+
+Support:
+
+- Labor classifications
+- Labor hours
+- Equipment
+- Equipment hours
+- Materials
+- Material markup
+- Travel
+- Per diem
+- Mobilization
+- Subcontractors
+- Other charges
+
+Require:
+
+- Customer
+- Project
+- T&M ticket number
+- Work description
+- Foreman signature
+- Customer representative signature when applicable
+- Supporting photos
+- Approval status
+
+Generate a printable T&M ticket.
+
+==================================================
+18. CUSTOMER-SPECIFIC BILLING REQUIREMENTS
+==================================================
+
+Allow companies to configure customer-specific invoice rules.
+
+Examples:
+
+- Required PO number
+- Required work-order number
+- Required circuit number
+- Required structure number
+- Required photo naming
+- Required customer signature
+- Required GPS location
+- Required daily report format
+- Required invoice grouping
+- Required billing period
+- Required supporting documents
+
+Block invoice-ready status when required information is missing.
+
+==================================================
+19. EXECUTIVE DASHBOARD
+==================================================
+
+Create a leadership dashboard.
+
+Show:
+
+- Active projects
+- Estimated contract value
+- Approved revenue
+- Invoiced revenue
+- Paid revenue
+- Revenue awaiting approval
+- Potential missing billing
+- Potential undercharge
+- Estimated direct costs
+- Estimated gross profit
+- Estimated gross margin
+- Projects over budget
+- Projects behind schedule
+- Reports awaiting approval
+- Invoice packages awaiting preparation
+- Most commonly missed billing codes
+- Most profitable work packages
+- Lowest-margin work packages
+
+Filters:
+
+- Company division
+- Customer
+- Project
+- Contract
+- Date range
+- Region
+- Crew
+- Foreman
+- Project manager
+
+==================================================
+20. PROJECT MANAGER DASHBOARD
+==================================================
+
+Create a project-manager dashboard.
+
+Show:
+
+- Daily production
+- Weekly production
+- Planned versus actual
+- Labor hours
+- Equipment hours
+- Material usage
+- Contract quantity completion
+- Estimated revenue
+- Estimated cost
+- Margin estimate
+- Missing documentation
+- Reports needing correction
+- Invoice readiness
+- Change orders
+- T&M tickets
+
+==================================================
+21. FOREMAN FEEDBACK LOOP
+==================================================
+
+Create a simple feedback loop for foremen.
+
+After a report is reviewed, show:
+
+- Approved
+- Approved with correction
+- Returned for correction
+- Billing item added
+- Quantity corrected
+- Documentation missing
+
+Show short learning guidance such as:
+
+“This work package typically includes mobilization on this contract.”
+
+Avoid exposing private financial data unless the foreman has permission.
+
+==================================================
+22. ACCOUNTING INTEGRATION ARCHITECTURE
+==================================================
+
+Prepare a clean integration layer for future accounting systems.
+
+Possible future targets:
+
+- QuickBooks
+- Sage
+- Viewpoint
+- Spectrum
+- Foundation
+- NetSuite
+- Custom ERP systems
+
+Do not create fake working integrations.
+
+Build:
+
+- Export interface
+- Integration status model
+- Field mapping
+- External ID storage
+- Sync history
+- Error handling
+- Retry architecture
+- Idempotency protection
+
+Provide CSV export profiles as the initial working method.
+
+==================================================
+23. EXPORT MAPPING
+==================================================
+
+Allow administrators to create reusable export mappings.
+
+Example:
+
+“Accounting System Billing Export”
+
+Map:
+
+- Project
+- Customer
+- Contract
+- Invoice number
+- Billing code
+- Description
+- Quantity
+- Unit type
+- Rate
+- Amount
+- Date
+- Crew
+- Foreman
+- Work order
+
+Support:
+
+- CSV
+- XLSX when available
+- PDF summaries
+
+==================================================
+24. NOTIFICATIONS
+==================================================
+
+Create in-app notifications for:
+
+- Missing daily report
+- Report returned for correction
+- High-priority billing warning
+- Production exceeds contract quantity
+- Invoice package ready
+- Change order approved
+- Customer rejection
+- Project margin below threshold
+- Cost overrun
+- Missing required documentation
+
+Allow notification preferences by role.
+
+==================================================
+25. PERMISSIONS
+==================================================
+
+Expand permissions.
+
+Foreman:
+- Create and submit reports
+- View own production
+- Correct returned reports
+- View limited approval feedback
+
+Supervisor:
+- Review crew reports
+- Approve production
+- Resolve operational warnings
+
+Billing reviewer:
+- Review rates
+- Review quantities
+- Prepare invoice data
+- Resolve billing warnings
+
+Project manager:
+- View project production
+- View project costs if permitted
+- Manage plans
+- Manage change orders
+- Review invoice readiness
+
+Company administrator:
+- Configure all settings
+- Manage costs
+- Manage exports
+- View all dashboards
+
+Executive:
+- View company-level financial and operational reporting
+
+Enforce all permissions server-side.
+
+==================================================
+26. AUDIT HISTORY
+==================================================
+
+Record changes to:
+
+- Contract quantities
+- Production quantities
+- Internal costs
+- Billing rates
+- Invoice statuses
+- Change orders
+- T&M tickets
+- Report-production reconciliation
+- Export records
+- Payment statuses
+
+Each audit event should include:
+
+- User
+- Company
+- Action
+- Previous value
+- New value
+- Reason
+- Timestamp
+
+==================================================
+27. MOBILE EXPERIENCE
+==================================================
+
+Optimize field-facing screens for mobile.
+
+Foreman-facing pages must include:
+
+- Fast report entry
+- Quick production quantities
+- Copy yesterday
+- Saved work packages
+- Photo uploads
+- T&M ticket creation
+- Correction notifications
+- Offline draft support
+
+Administrative financial dashboards may use responsive tables but must still remain usable on a phone.
+
+Requirements:
+
+- No horizontal page overflow
+- Large tap targets
+- Mobile-friendly cards
+- Searchable selectors
+- Sticky save actions
+- Keyboard-safe forms
+- Collapsible financial details
+
+==================================================
+28. DEMO DATA
+==================================================
+
+Create fictional demo data for:
+
+Company:
+- Prairie Line Contractors
+
+Customer:
+- Red River Electric Utility
+
+Projects:
+- North District Pole Replacement
+- West Feeder Storm Restoration
+
+Include:
+
+- Contract quantities
+- Charge-sheet items
+- Daily reports
+- Approved production
+- Labor costs
+- Equipment costs
+- Material costs
+- Change order
+- T&M ticket
+- Invoice-ready production
+- Potential missing billing examples
+
+Clearly label all demo data as fictional.
+
+==================================================
+29. AUTOMATED TESTING
+==================================================
+
+Add tests for:
+
+- Production creation from approved reports
+- Contract quantity imports
+- Contract quantity remaining calculations
+- Change-order quantity updates
+- Job-cost calculations
+- Labor burden calculations
+- Equipment cost calculations
+- Material markup calculations
+- Revenue calculations
+- Gross-margin calculations
+- Planned versus actual calculations
+- Report-production reconciliation
+- Duplicate production prevention
+- Invoice-ready validation
+- Customer requirement validation
+- T&M ticket calculations
+- Export mapping
+- Permission enforcement
+- Company isolation
+- Historical rate preservation
+- Mobile rendering
+
+Edge cases:
+
+- Production exceeds contract quantity
+- Negative change order
+- Rate changes mid-project
+- Cost changes mid-project
+- Approved report amended later
+- Duplicate invoice export
+- Customer rejects part of an invoice
+- Partial payment
+- Missing material cost
+- Customer-provided material
+- Zero-revenue report
+- Cost higher than revenue
+- Multiple contracts on one project
+- T&M ticket without customer signature
+- Deleted employee with historical labor entries
+
+==================================================
+30. REGRESSION TESTING
+==================================================
+
+Retest all existing systems:
+
+- Registration
+- Authentication
+- Company onboarding
+- Crews
+- Projects
+- Daily reports
+- Labor entry
+- Equipment entry
+- Material entry
+- Work packages
+- Charge sheets
+- Imports
+- Billing rules
+- Missing-charge detection
+- Undercharge detection
+- Approvals
+- Report locking
+- Amendments
+- Mobile layout
+- PDF generation
+- Audit history
+
+Fix all discovered regressions before completion.
+
+==================================================
+COMPLETION REQUIREMENTS
+==================================================
+
+Do not stop after creating visual mockups.
+
+Deliver working:
+
+- Contract quantity management
+- Production tracking
+- Daily and weekly production summaries
+- Job costing
+- Internal labor and equipment costs
+- Material costing and markup
+- Revenue tracking
+- Gross-margin estimates
+- Planned versus actual reporting
+- Crew productivity metrics
+- Report-production reconciliation
+- Invoice preparation
+- Invoice backup packages
+- Change orders
+- T&M tickets
+- Customer billing requirements
+- Executive dashboards
+- Project-manager dashboards
+- Export mappings
+- Permissions
+- Audit logging
+- Automated tests
+
+At completion, provide:
+
+1. Features built
+2. Database migrations
+3. Production logic
+4. Job-cost assumptions
+5. Revenue and margin calculations
+6. Invoice-preparation workflow
+7. Change-order workflow
+8. Permissions added
+9. Tests completed
+10. Existing bugs fixed
+11. Features still mocked
+12. Known limitations
+13. Recommended next phase
+
+Primary success condition:
+
+An approved daily report should automatically feed project production, compare against contract quantities, calculate estimated revenue and direct cost, identify reconciliation problems, and become part of a complete invoice-preparation package without requiring office staff to re-enter the same information.
