@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Foreman AI"
+description = "A mobile-first web app for utility construction foremen. Allows foremen to record daily job activity via guided form or voice dictation, generate professional daily reports, manage crews and projects, enforce role-based permissions (Foreman, Supervisor, Admin), and export/print PDF reports."
+version = "1.0.0"
+id = "artifacts/foreman-ai"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 23323
+
+[services.development]
+run = "pnpm --filter @workspace/foreman-ai run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/foreman-ai", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/foreman-ai/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23323"
+BASE_PATH = "/"

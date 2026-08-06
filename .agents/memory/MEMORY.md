@@ -1,0 +1,4 @@
+- [Zod v4 orval fix](zod-orval-fix.md) — orval 8.23.0 generates zod.int() (v4 API); must patch generated file to `import * as zod from 'zod/v4'` after each codegen run
+- [QueryClientProvider placement](query-client-provider.md) — design subagent omits QueryClientProvider; always verify App.tsx wraps ClerkProvider inside QueryClientProvider, not outside
+- [DB seed approach](db-seed.md) — seed via `node --input-type=module` from `lib/db/` directory so pg package resolves; do not use scripts/ at root since pg isn't in root package.json
+- [Foreman AI architecture](foreman-ai-arch.md) — full-stack daily report app: React+Vite frontend, Express 5 API, Postgres+Drizzle; demo company "Prairie Line Contractors" (ID=1) seeded with 2 crews, 2 projects, 3 reports

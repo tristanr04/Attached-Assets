@@ -1,0 +1,275 @@
+Create a new full-stack, mobile-first web application called “Foreman AI.”
+
+This must be an entirely independent application with its own database, authentication, user roles, files, and deployment configuration.
+
+CORE PRODUCT PURPOSE
+
+Foreman AI helps utility-construction and powerline foremen reduce the 6–12 hours per week they currently spend completing paperwork after work.
+
+The application should allow a foreman to record what happened during the workday using a fast guided form or voice dictation. The system then converts that information into a professional, editable daily job report.
+
+Build only the foundational MVP in this phase. Do not attempt every future feature yet.
+
+PRIMARY USERS
+
+1. Foreman
+2. General foreman or supervisor
+3. Company administrator
+
+MVP WORKFLOW
+
+A foreman should be able to:
+
+1. Create an account and sign in.
+2. Create or join a company.
+3. Create a crew.
+4. Add crew members.
+5. Create a job or project.
+6. Start a daily report.
+7. Enter information through a guided form.
+8. Use voice dictation for the work summary.
+9. Review and edit the completed report.
+10. Save it as a draft.
+11. Mark it complete.
+12. Export or print it as a professional PDF.
+13. View previous daily reports.
+
+DAILY REPORT FIELDS
+
+Include:
+
+* Report date
+* Company
+* Project name
+* Job number
+* Work location
+* Foreman
+* General foreman
+* Customer or utility
+* Crew members present
+* Employee hours
+* Start time
+* Stop time
+* Regular hours
+* Overtime hours
+* Double-time hours
+* Weather conditions
+* Work performed
+* Structures, poles, transformers, or equipment installed
+* Materials used
+* Equipment and trucks used
+* Safety meeting or tailboard completed
+* Delays
+* Outages
+* Customer issues
+* Injuries or incidents
+* Photos
+* Additional notes
+* Foreman signature
+* Report status
+
+VOICE-TO-REPORT EXPERIENCE
+
+Add a large button labeled:
+
+“Describe Today’s Work”
+
+Allow the foreman to dictate or type a casual work summary.
+
+Example:
+
+“Crew 17 worked Circuit 4 today. We changed three poles and one transformer, installed two crossarms and one guy wire. Everyone worked twelve hours. We had a two-hour weather delay and no injuries.”
+
+Create a structured processing layer that converts this text into suggested report fields.
+
+For the first version, the extraction system may use clearly separated parsing logic and mocked AI results if an AI provider has not yet been configured.
+
+Never pretend that mocked AI processing is real. Clearly label development fallback behavior.
+
+The user must review and approve all generated information before the report can be finalized.
+
+DATABASE
+
+Create a proper relational database with models for:
+
+* Users
+* Companies
+* Company memberships
+* Crews
+* Crew members
+* Projects
+* Daily reports
+* Employee time entries
+* Materials
+* Report materials
+* Equipment
+* Report equipment
+* Photos
+* Signatures
+* Activity logs
+
+Use stable IDs and timestamps.
+
+Do not store critical operational data only in browser local storage.
+
+AUTHENTICATION AND PERMISSIONS
+
+Add secure authentication.
+
+Roles:
+
+* Foreman
+* Supervisor
+* Company administrator
+
+Permissions:
+
+* Foremen can manage their own crews and reports.
+* Supervisors can view reports belonging to assigned crews.
+* Administrators can manage the company, users, projects, templates, and all reports.
+* Users must never access another company’s private information.
+* Enforce permissions on the server, not only through hidden interface elements.
+
+USER INTERFACE
+
+Design for foremen using phones outdoors or inside work trucks.
+
+Use:
+
+* Large tap targets
+* High-contrast text
+* Simple navigation
+* Minimal typing
+* Autosave
+* Clear draft and completed states
+* A dashboard showing unfinished reports
+* A prominent “Start Today’s Report” button
+* Simple step-by-step report sections
+* Mobile photo uploading
+* Clear confirmation before deleting information
+
+The design should feel rugged, professional, modern, and appropriate for the utility-construction industry.
+
+Do not make it look like generic accounting software.
+
+DASHBOARDS
+
+Foreman dashboard:
+
+* Start today’s report
+* Continue unfinished report
+* Recent reports
+* Current crew
+* Current project
+
+Supervisor dashboard:
+
+* Reports awaiting review
+* Missing daily reports
+* Reports by crew
+* Recent incidents or delays
+
+Administrator dashboard:
+
+* User and crew management
+* Projects
+* Reports
+* Company settings
+* Basic usage statistics
+
+REPORT OUTPUT
+
+Generate a clean printable report containing:
+
+* Company information
+* Project details
+* Crew and employee hours
+* Work performed
+* Materials
+* Equipment
+* Delays
+* Safety and incident information
+* Photos
+* Notes
+* Foreman signature
+* Creation and completion timestamps
+
+The PDF should look professional enough to send to a general foreman, contractor, utility, or customer.
+
+RELIABILITY
+
+Include:
+
+* Form validation
+* Autosave
+* Draft recovery
+* Loading indicators
+* Clear error messages
+* Duplicate-submission prevention
+* Server-side authorization
+* Structured logging
+* Database migrations
+* Seed data for testing
+
+TEST DATA
+
+Create a demo company called “Prairie Line Contractors.”
+
+Create:
+
+* One administrator
+* One supervisor
+* Two foremen
+* Two crews
+* Two projects
+* Several crew members
+* Three realistic sample daily reports
+
+Do not use real personal information.
+
+DEVELOPMENT REQUIREMENTS
+
+* Select a stable, maintainable full-stack architecture.
+* Keep components modular.
+* Separate database, business logic, AI parsing, report generation, and user-interface code.
+* Use environment variables or Replit Secrets for sensitive credentials.
+* Never hard-code API keys.
+* Add a README explaining the architecture and how to run and test the app.
+* Add a replit.md file documenting the project rules and current product scope.
+* Do not publish the app yet.
+* Do not connect paid third-party services during this phase.
+* Do not modify or access any other Replit project.
+
+TESTING
+
+Test the full workflow:
+
+1. Sign in.
+2. Create a crew and project.
+3. Start a daily report.
+4. Add employee time.
+5. Add materials and equipment.
+6. Enter a dictated work summary.
+7. Review the structured fields.
+8. Save and reopen the draft.
+9. Add a photo.
+10. Complete the report.
+11. Export or print it.
+12. Confirm that a different company cannot access it.
+
+Fix any errors encountered during testing.
+
+COMPLETION REQUIREMENT
+
+Do not stop after generating a landing page or visual mockup.
+
+Deliver a functional MVP with working navigation, authentication, database persistence, report creation, report editing, role permissions, sample data, and printable report output.
+
+At completion, summarize:
+
+* What was built
+* What is fully operational
+* What is mocked
+* What still needs an external integration
+* Known limitations
+* Recommended next development phase

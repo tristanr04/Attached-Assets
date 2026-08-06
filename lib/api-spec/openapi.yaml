@@ -3,20 +3,46 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Foreman AI API specification
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Auth and user profile
+  - name: companies
+    description: Company management
+  - name: crews
+    description: Crew management
+  - name: projects
+    description: Project management
+  - name: reports
+    description: Daily reports
+  - name: time-entries
+    description: Employee time entries
+  - name: report-materials
+    description: Materials on a report
+  - name: report-equipment
+    description: Equipment on a report
+  - name: photos
+    description: Report photos
+  - name: signatures
+    description: Report signatures
+  - name: catalog
+    description: Materials and equipment catalog
+  - name: dictation
+    description: AI voice dictation parsing
+  - name: dashboard
+    description: Dashboard summaries
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +50,1328 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # ──── Auth / User Profile ────────────────────────────────────────────────
+  /me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user profile
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "401":
+          description: Unauthorized
+    post:
+      operationId: upsertMe
+      tags: [auth]
+      summary: Create or update user profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserProfileInput"
+      responses:
+        "200":
+          description: Updated user profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "401":
+          description: Unauthorized
+
+  # ──── Companies ──────────────────────────────────────────────────────────
+  /companies:
+    get:
+      operationId: listCompanies
+      tags: [companies]
+      summary: List companies the current user belongs to
+      responses:
+        "200":
+          description: List of companies
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Company"
+        "401":
+          description: Unauthorized
+    post:
+      operationId: createCompany
+      tags: [companies]
+      summary: Create a new company
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompanyInput"
+      responses:
+        "201":
+          description: Created company
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Company"
+        "400":
+          description: Validation error
+        "401":
+          description: Unauthorized
+
+  /companies/{companyId}:
+    get:
+      operationId: getCompany
+      tags: [companies]
+      summary: Get a company by ID
+      parameters:
+        - name: companyId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Company
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Company"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+    patch:
+      operationId: updateCompany
+      tags: [companies]
+      summary: Update a company
+      parameters:
+        - name: companyId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompanyUpdate"
+      responses:
+        "200":
+          description: Updated company
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Company"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+
+  /companies/{companyId}/members:
+    get:
+      operationId: listCompanyMembers
+      tags: [companies]
+      summary: List members of a company
+      parameters:
+        - name: companyId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CompanyMember"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+    post:
+      operationId: addCompanyMember
+      tags: [companies]
+      summary: Add or invite a member to a company
+      parameters:
+        - name: companyId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompanyMemberInput"
+      responses:
+        "201":
+          description: Member added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompanyMember"
+        "400":
+          description: Validation error
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+
+  /companies/{companyId}/members/{memberId}:
+    patch:
+      operationId: updateCompanyMember
+      tags: [companies]
+      summary: Update a member's role
+      parameters:
+        - name: companyId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: memberId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompanyMemberUpdate"
+      responses:
+        "200":
+          description: Updated member
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompanyMember"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+    delete:
+      operationId: removeCompanyMember
+      tags: [companies]
+      summary: Remove a member from a company
+      parameters:
+        - name: companyId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: memberId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Member removed
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+
+  # ──── Crews ──────────────────────────────────────────────────────────────
+  /crews:
+    get:
+      operationId: listCrews
+      tags: [crews]
+      summary: List crews for the current user's company
+      parameters:
+        - name: companyId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of crews
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Crew"
+        "401":
+          description: Unauthorized
+    post:
+      operationId: createCrew
+      tags: [crews]
+      summary: Create a new crew
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CrewInput"
+      responses:
+        "201":
+          description: Created crew
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Crew"
+        "400":
+          description: Validation error
+        "401":
+          description: Unauthorized
+
+  /crews/{crewId}:
+    get:
+      operationId: getCrew
+      tags: [crews]
+      summary: Get a crew by ID
+      parameters:
+        - name: crewId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Crew
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Crew"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+    patch:
+      operationId: updateCrew
+      tags: [crews]
+      summary: Update a crew
+      parameters:
+        - name: crewId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CrewUpdate"
+      responses:
+        "200":
+          description: Updated crew
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Crew"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteCrew
+      tags: [crews]
+      summary: Delete a crew
+      parameters:
+        - name: crewId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+
+  /crews/{crewId}/members:
+    get:
+      operationId: listCrewMembers
+      tags: [crews]
+      summary: List members of a crew
+      parameters:
+        - name: crewId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Crew members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CrewMember"
+        "401":
+          description: Unauthorized
+    post:
+      operationId: addCrewMember
+      tags: [crews]
+      summary: Add a member to a crew
+      parameters:
+        - name: crewId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CrewMemberInput"
+      responses:
+        "201":
+          description: Crew member added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CrewMember"
+        "400":
+          description: Validation error
+        "401":
+          description: Unauthorized
+
+  /crews/{crewId}/members/{memberId}:
+    patch:
+      operationId: updateCrewMember
+      tags: [crews]
+      summary: Update a crew member
+      parameters:
+        - name: crewId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: memberId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CrewMemberUpdate"
+      responses:
+        "200":
+          description: Updated crew member
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CrewMember"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+    delete:
+      operationId: removeCrewMember
+      tags: [crews]
+      summary: Remove a member from a crew
+      parameters:
+        - name: crewId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: memberId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+
+  # ──── Projects ───────────────────────────────────────────────────────────
+  /projects:
+    get:
+      operationId: listProjects
+      tags: [projects]
+      summary: List projects
+      parameters:
+        - name: companyId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Project"
+        "401":
+          description: Unauthorized
+    post:
+      operationId: createProject
+      tags: [projects]
+      summary: Create a project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectInput"
+      responses:
+        "201":
+          description: Created project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "400":
+          description: Validation error
+        "401":
+          description: Unauthorized
+
+  /projects/{projectId}:
+    get:
+      operationId: getProject
+      tags: [projects]
+      summary: Get a project by ID
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+    patch:
+      operationId: updateProject
+      tags: [projects]
+      summary: Update a project
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectUpdate"
+      responses:
+        "200":
+          description: Updated project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+
+  # ──── Daily Reports ───────────────────────────────────────────────────────
+  /reports:
+    get:
+      operationId: listReports
+      tags: [reports]
+      summary: List daily reports
+      parameters:
+        - name: companyId
+          in: query
+          schema:
+            type: integer
+        - name: crewId
+          in: query
+          schema:
+            type: integer
+        - name: projectId
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [draft, complete]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of reports
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DailyReport"
+        "401":
+          description: Unauthorized
+    post:
+      operationId: createReport
+      tags: [reports]
+      summary: Create a new daily report
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DailyReportInput"
+      responses:
+        "201":
+          description: Created report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DailyReport"
+        "400":
+          description: Validation error
+        "401":
+          description: Unauthorized
+
+  /reports/{reportId}:
+    get:
+      operationId: getReport
+      tags: [reports]
+      summary: Get a daily report by ID (includes time entries, materials, equipment, photos)
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Full report details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DailyReportDetail"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+    patch:
+      operationId: updateReport
+      tags: [reports]
+      summary: Update a daily report
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DailyReportUpdate"
+      responses:
+        "200":
+          description: Updated report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DailyReport"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteReport
+      tags: [reports]
+      summary: Delete a daily report (draft only)
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+
+  /reports/{reportId}/complete:
+    post:
+      operationId: completeReport
+      tags: [reports]
+      summary: Mark a report as complete
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Completed report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DailyReport"
+        "400":
+          description: Cannot complete (validation errors)
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+
+  # ──── Time Entries ────────────────────────────────────────────────────────
+  /reports/{reportId}/time-entries:
+    get:
+      operationId: listTimeEntries
+      tags: [time-entries]
+      summary: List time entries for a report
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Time entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TimeEntry"
+        "401":
+          description: Unauthorized
+    post:
+      operationId: createTimeEntry
+      tags: [time-entries]
+      summary: Add a time entry to a report
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TimeEntryInput"
+      responses:
+        "201":
+          description: Created time entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TimeEntry"
+        "400":
+          description: Validation error
+        "401":
+          description: Unauthorized
+
+  /reports/{reportId}/time-entries/{entryId}:
+    patch:
+      operationId: updateTimeEntry
+      tags: [time-entries]
+      summary: Update a time entry
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: entryId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TimeEntryUpdate"
+      responses:
+        "200":
+          description: Updated time entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TimeEntry"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteTimeEntry
+      tags: [time-entries]
+      summary: Delete a time entry
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: entryId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+
+  # ──── Report Materials ────────────────────────────────────────────────────
+  /reports/{reportId}/materials:
+    get:
+      operationId: listReportMaterials
+      tags: [report-materials]
+      summary: List materials used on a report
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Report materials
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReportMaterial"
+        "401":
+          description: Unauthorized
+    post:
+      operationId: addReportMaterial
+      tags: [report-materials]
+      summary: Add a material to a report
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportMaterialInput"
+      responses:
+        "201":
+          description: Material added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportMaterial"
+        "401":
+          description: Unauthorized
+
+  /reports/{reportId}/materials/{materialId}:
+    patch:
+      operationId: updateReportMaterial
+      tags: [report-materials]
+      summary: Update a report material
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: materialId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportMaterialUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportMaterial"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteReportMaterial
+      tags: [report-materials]
+      summary: Remove a material from a report
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: materialId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+
+  # ──── Report Equipment ────────────────────────────────────────────────────
+  /reports/{reportId}/equipment:
+    get:
+      operationId: listReportEquipment
+      tags: [report-equipment]
+      summary: List equipment used on a report
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Report equipment
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReportEquipment"
+        "401":
+          description: Unauthorized
+    post:
+      operationId: addReportEquipment
+      tags: [report-equipment]
+      summary: Add equipment to a report
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportEquipmentInput"
+      responses:
+        "201":
+          description: Equipment added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportEquipment"
+        "401":
+          description: Unauthorized
+
+  /reports/{reportId}/equipment/{equipmentId}:
+    patch:
+      operationId: updateReportEquipment
+      tags: [report-equipment]
+      summary: Update report equipment
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: equipmentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportEquipmentUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportEquipment"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteReportEquipment
+      tags: [report-equipment]
+      summary: Remove equipment from a report
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: equipmentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+
+  # ──── Photos ─────────────────────────────────────────────────────────────
+  /reports/{reportId}/photos:
+    get:
+      operationId: listReportPhotos
+      tags: [photos]
+      summary: List photos for a report
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Photos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Photo"
+        "401":
+          description: Unauthorized
+    post:
+      operationId: addReportPhoto
+      tags: [photos]
+      summary: Add a photo to a report (base64 upload)
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PhotoInput"
+      responses:
+        "201":
+          description: Photo added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Photo"
+        "401":
+          description: Unauthorized
+
+  /reports/{reportId}/photos/{photoId}:
+    delete:
+      operationId: deleteReportPhoto
+      tags: [photos]
+      summary: Delete a photo from a report
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: photoId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+
+  # ──── Signature ───────────────────────────────────────────────────────────
+  /reports/{reportId}/signature:
+    post:
+      operationId: saveSignature
+      tags: [signatures]
+      summary: Save or update foreman signature on a report
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignatureInput"
+      responses:
+        "200":
+          description: Signature saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Signature"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+
+  # ──── Materials Catalog ───────────────────────────────────────────────────
+  /catalog/materials:
+    get:
+      operationId: listCatalogMaterials
+      tags: [catalog]
+      summary: List materials catalog for a company
+      parameters:
+        - name: companyId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Materials catalog
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CatalogMaterial"
+        "401":
+          description: Unauthorized
+    post:
+      operationId: createCatalogMaterial
+      tags: [catalog]
+      summary: Add a material to the catalog
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CatalogMaterialInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CatalogMaterial"
+        "401":
+          description: Unauthorized
+
+  # ──── Equipment Catalog ───────────────────────────────────────────────────
+  /catalog/equipment:
+    get:
+      operationId: listCatalogEquipment
+      tags: [catalog]
+      summary: List equipment catalog for a company
+      parameters:
+        - name: companyId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Equipment catalog
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CatalogEquipment"
+        "401":
+          description: Unauthorized
+    post:
+      operationId: createCatalogEquipment
+      tags: [catalog]
+      summary: Add equipment to the catalog
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CatalogEquipmentInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CatalogEquipment"
+        "401":
+          description: Unauthorized
+
+  # ──── Voice Dictation Parsing ─────────────────────────────────────────────
+  /parse-dictation:
+    post:
+      operationId: parseDictation
+      tags: [dictation]
+      summary: Parse a voice dictation or text summary into structured report fields
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DictationInput"
+      responses:
+        "200":
+          description: Parsed report fields (requires user review before saving)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DictationResult"
+        "400":
+          description: Validation error
+        "401":
+          description: Unauthorized
+
+  # ──── Dashboard ───────────────────────────────────────────────────────────
+  /dashboard:
+    get:
+      operationId: getForemanDashboard
+      tags: [dashboard]
+      summary: Foreman dashboard — today's report status, recent reports, current crew
+      parameters:
+        - name: companyId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Foreman dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForemanDashboard"
+        "401":
+          description: Unauthorized
+
+  /dashboard/supervisor:
+    get:
+      operationId: getSupervisorDashboard
+      tags: [dashboard]
+      summary: Supervisor dashboard — reports awaiting review, missing reports, recent incidents
+      parameters:
+        - name: companyId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Supervisor dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupervisorDashboard"
+        "401":
+          description: Unauthorized
+
+  /dashboard/admin:
+    get:
+      operationId: getAdminDashboard
+      tags: [dashboard]
+      summary: Admin dashboard — usage stats, crew/project summaries
+      parameters:
+        - name: companyId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Admin dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminDashboard"
+        "401":
+          description: Unauthorized
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +1382,874 @@ components:
       required:
         - status
 
+    # ── User Profile ───────────────────────────────────────────────────────
+    UserProfile:
+      type: object
+      required: [id, clerkUserId, email, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        clerkUserId:
+          type: string
+        email:
+          type: string
+        firstName:
+          type: ["string", "null"]
+        lastName:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    UserProfileInput:
+      type: object
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        phone:
+          type: ["string", "null"]
+        email:
+          type: string
+
+    # ── Company ────────────────────────────────────────────────────────────
+    Company:
+      type: object
+      required: [id, name, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        address:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        logoUrl:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    CompanyInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        address:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+
+    CompanyUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        address:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        logoUrl:
+          type: ["string", "null"]
+
+    CompanyMember:
+      type: object
+      required: [id, companyId, role, createdAt]
+      properties:
+        id:
+          type: integer
+        companyId:
+          type: integer
+        userId:
+          type: ["integer", "null"]
+        clerkUserId:
+          type: ["string", "null"]
+        email:
+          type: string
+        firstName:
+          type: ["string", "null"]
+        lastName:
+          type: ["string", "null"]
+        role:
+          type: string
+          enum: [admin, supervisor, foreman]
+        createdAt:
+          type: string
+
+    CompanyMemberInput:
+      type: object
+      required: [email, role]
+      properties:
+        email:
+          type: string
+        role:
+          type: string
+          enum: [admin, supervisor, foreman]
+        firstName:
+          type: string
+        lastName:
+          type: string
+
+    CompanyMemberUpdate:
+      type: object
+      properties:
+        role:
+          type: string
+          enum: [admin, supervisor, foreman]
+
+    # ── Crew ───────────────────────────────────────────────────────────────
+    Crew:
+      type: object
+      required: [id, companyId, name, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        companyId:
+          type: integer
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        foremanId:
+          type: ["integer", "null"]
+        foremanName:
+          type: ["string", "null"]
+        memberCount:
+          type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    CrewInput:
+      type: object
+      required: [companyId, name]
+      properties:
+        companyId:
+          type: integer
+        name:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        foremanId:
+          type: integer
+
+    CrewUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        description:
+          type: ["string", "null"]
+        foremanId:
+          type: ["integer", "null"]
+
+    CrewMember:
+      type: object
+      required: [id, crewId, name, trade, createdAt]
+      properties:
+        id:
+          type: integer
+        crewId:
+          type: integer
+        userId:
+          type: ["integer", "null"]
+        name:
+          type: string
+        trade:
+          type: string
+        classification:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    CrewMemberInput:
+      type: object
+      required: [name, trade]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        trade:
+          type: string
+          minLength: 1
+        classification:
+          type: string
+        userId:
+          type: integer
+
+    CrewMemberUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        trade:
+          type: string
+        classification:
+          type: ["string", "null"]
+
+    # ── Project ────────────────────────────────────────────────────────────
+    Project:
+      type: object
+      required: [id, companyId, name, status, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        companyId:
+          type: integer
+        name:
+          type: string
+        jobNumber:
+          type: ["string", "null"]
+        customer:
+          type: ["string", "null"]
+        workLocation:
+          type: ["string", "null"]
+        description:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [active, inactive, complete]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    ProjectInput:
+      type: object
+      required: [companyId, name]
+      properties:
+        companyId:
+          type: integer
+        name:
+          type: string
+          minLength: 1
+        jobNumber:
+          type: string
+        customer:
+          type: string
+        workLocation:
+          type: string
+        description:
+          type: string
+
+    ProjectUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        jobNumber:
+          type: ["string", "null"]
+        customer:
+          type: ["string", "null"]
+        workLocation:
+          type: ["string", "null"]
+        description:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [active, inactive, complete]
+
+    # ── Daily Report ───────────────────────────────────────────────────────
+    DailyReport:
+      type: object
+      required: [id, companyId, reportDate, status, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        companyId:
+          type: integer
+        projectId:
+          type: ["integer", "null"]
+        crewId:
+          type: ["integer", "null"]
+        foremanId:
+          type: ["integer", "null"]
+        reportDate:
+          type: string
+        status:
+          type: string
+          enum: [draft, complete]
+        projectName:
+          type: ["string", "null"]
+        crewName:
+          type: ["string", "null"]
+        foremanName:
+          type: ["string", "null"]
+        workLocation:
+          type: ["string", "null"]
+        generalForeman:
+          type: ["string", "null"]
+        startTime:
+          type: ["string", "null"]
+        stopTime:
+          type: ["string", "null"]
+        weatherConditions:
+          type: ["string", "null"]
+        workPerformed:
+          type: ["string", "null"]
+        structuresInstalled:
+          type: ["string", "null"]
+        safetyMeeting:
+          type: ["boolean", "null"]
+        safetyNotes:
+          type: ["string", "null"]
+        delays:
+          type: ["string", "null"]
+        outages:
+          type: ["string", "null"]
+        customerIssues:
+          type: ["string", "null"]
+        injuries:
+          type: ["boolean", "null"]
+        injuryDetails:
+          type: ["string", "null"]
+        additionalNotes:
+          type: ["string", "null"]
+        completedAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    DailyReportDetail:
+      allOf:
+        - $ref: "#/components/schemas/DailyReport"
+        - type: object
+          properties:
+            timeEntries:
+              type: array
+              items:
+                $ref: "#/components/schemas/TimeEntry"
+            materials:
+              type: array
+              items:
+                $ref: "#/components/schemas/ReportMaterial"
+            equipment:
+              type: array
+              items:
+                $ref: "#/components/schemas/ReportEquipment"
+            photos:
+              type: array
+              items:
+                $ref: "#/components/schemas/Photo"
+            signature:
+              oneOf:
+                - $ref: "#/components/schemas/Signature"
+                - type: "null"
+
+    DailyReportInput:
+      type: object
+      required: [companyId, reportDate]
+      properties:
+        companyId:
+          type: integer
+        projectId:
+          type: integer
+        crewId:
+          type: integer
+        reportDate:
+          type: string
+        workLocation:
+          type: string
+        generalForeman:
+          type: string
+        startTime:
+          type: string
+        stopTime:
+          type: string
+        weatherConditions:
+          type: string
+        workPerformed:
+          type: string
+        structuresInstalled:
+          type: string
+        safetyMeeting:
+          type: boolean
+        safetyNotes:
+          type: string
+        delays:
+          type: string
+        outages:
+          type: string
+        customerIssues:
+          type: string
+        injuries:
+          type: boolean
+        injuryDetails:
+          type: string
+        additionalNotes:
+          type: string
+
+    DailyReportUpdate:
+      type: object
+      properties:
+        projectId:
+          type: ["integer", "null"]
+        crewId:
+          type: ["integer", "null"]
+        reportDate:
+          type: string
+        workLocation:
+          type: ["string", "null"]
+        generalForeman:
+          type: ["string", "null"]
+        startTime:
+          type: ["string", "null"]
+        stopTime:
+          type: ["string", "null"]
+        weatherConditions:
+          type: ["string", "null"]
+        workPerformed:
+          type: ["string", "null"]
+        structuresInstalled:
+          type: ["string", "null"]
+        safetyMeeting:
+          type: ["boolean", "null"]
+        safetyNotes:
+          type: ["string", "null"]
+        delays:
+          type: ["string", "null"]
+        outages:
+          type: ["string", "null"]
+        customerIssues:
+          type: ["string", "null"]
+        injuries:
+          type: ["boolean", "null"]
+        injuryDetails:
+          type: ["string", "null"]
+        additionalNotes:
+          type: ["string", "null"]
+
+    # ── Time Entry ─────────────────────────────────────────────────────────
+    TimeEntry:
+      type: object
+      required: [id, reportId, employeeName, trade, regularHours, createdAt]
+      properties:
+        id:
+          type: integer
+        reportId:
+          type: integer
+        crewMemberId:
+          type: ["integer", "null"]
+        employeeName:
+          type: string
+        trade:
+          type: string
+        regularHours:
+          type: number
+        overtimeHours:
+          type: number
+        doubleTimeHours:
+          type: number
+        createdAt:
+          type: string
+
+    TimeEntryInput:
+      type: object
+      required: [employeeName, trade, regularHours]
+      properties:
+        crewMemberId:
+          type: integer
+        employeeName:
+          type: string
+          minLength: 1
+        trade:
+          type: string
+          minLength: 1
+        regularHours:
+          type: number
+          minimum: 0
+        overtimeHours:
+          type: number
+          minimum: 0
+        doubleTimeHours:
+          type: number
+          minimum: 0
+
+    TimeEntryUpdate:
+      type: object
+      properties:
+        employeeName:
+          type: string
+        trade:
+          type: string
+        regularHours:
+          type: number
+          minimum: 0
+        overtimeHours:
+          type: number
+          minimum: 0
+        doubleTimeHours:
+          type: number
+          minimum: 0
+
+    # ── Report Materials ───────────────────────────────────────────────────
+    ReportMaterial:
+      type: object
+      required: [id, reportId, name, quantity, unit, createdAt]
+      properties:
+        id:
+          type: integer
+        reportId:
+          type: integer
+        catalogMaterialId:
+          type: ["integer", "null"]
+        name:
+          type: string
+        quantity:
+          type: number
+        unit:
+          type: string
+        notes:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    ReportMaterialInput:
+      type: object
+      required: [name, quantity, unit]
+      properties:
+        catalogMaterialId:
+          type: integer
+        name:
+          type: string
+          minLength: 1
+        quantity:
+          type: number
+          minimum: 0
+        unit:
+          type: string
+          minLength: 1
+        notes:
+          type: string
+
+    ReportMaterialUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        quantity:
+          type: number
+          minimum: 0
+        unit:
+          type: string
+        notes:
+          type: ["string", "null"]
+
+    # ── Report Equipment ───────────────────────────────────────────────────
+    ReportEquipment:
+      type: object
+      required: [id, reportId, name, hoursUsed, createdAt]
+      properties:
+        id:
+          type: integer
+        reportId:
+          type: integer
+        catalogEquipmentId:
+          type: ["integer", "null"]
+        name:
+          type: string
+        unitId:
+          type: ["string", "null"]
+        hoursUsed:
+          type: number
+        notes:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    ReportEquipmentInput:
+      type: object
+      required: [name, hoursUsed]
+      properties:
+        catalogEquipmentId:
+          type: integer
+        name:
+          type: string
+          minLength: 1
+        unitId:
+          type: string
+        hoursUsed:
+          type: number
+          minimum: 0
+        notes:
+          type: string
+
+    ReportEquipmentUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        unitId:
+          type: ["string", "null"]
+        hoursUsed:
+          type: number
+          minimum: 0
+        notes:
+          type: ["string", "null"]
+
+    # ── Photo ──────────────────────────────────────────────────────────────
+    Photo:
+      type: object
+      required: [id, reportId, url, createdAt]
+      properties:
+        id:
+          type: integer
+        reportId:
+          type: integer
+        url:
+          type: string
+        caption:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    PhotoInput:
+      type: object
+      required: [dataUrl]
+      properties:
+        dataUrl:
+          type: string
+        caption:
+          type: string
+
+    # ── Signature ──────────────────────────────────────────────────────────
+    Signature:
+      type: object
+      required: [id, reportId, dataUrl, createdAt]
+      properties:
+        id:
+          type: integer
+        reportId:
+          type: integer
+        dataUrl:
+          type: string
+        createdAt:
+          type: string
+
+    SignatureInput:
+      type: object
+      required: [dataUrl]
+      properties:
+        dataUrl:
+          type: string
+
+    # ── Catalog ────────────────────────────────────────────────────────────
+    CatalogMaterial:
+      type: object
+      required: [id, companyId, name, unit, createdAt]
+      properties:
+        id:
+          type: integer
+        companyId:
+          type: integer
+        name:
+          type: string
+        unit:
+          type: string
+        createdAt:
+          type: string
+
+    CatalogMaterialInput:
+      type: object
+      required: [companyId, name, unit]
+      properties:
+        companyId:
+          type: integer
+        name:
+          type: string
+          minLength: 1
+        unit:
+          type: string
+          minLength: 1
+
+    CatalogEquipment:
+      type: object
+      required: [id, companyId, name, createdAt]
+      properties:
+        id:
+          type: integer
+        companyId:
+          type: integer
+        name:
+          type: string
+        type:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    CatalogEquipmentInput:
+      type: object
+      required: [companyId, name]
+      properties:
+        companyId:
+          type: integer
+        name:
+          type: string
+          minLength: 1
+        type:
+          type: string
+
+    # ── Dictation ─────────────────────────────────────────────────────────
+    DictationInput:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+          minLength: 1
+        reportId:
+          type: integer
+
+    DictationResult:
+      type: object
+      required: [isMocked, parsedFields]
+      properties:
+        isMocked:
+          type: boolean
+        parsedFields:
+          type: object
+          properties:
+            workPerformed:
+              type: ["string", "null"]
+            structuresInstalled:
+              type: ["string", "null"]
+            delays:
+              type: ["string", "null"]
+            injuries:
+              type: ["boolean", "null"]
+            injuryDetails:
+              type: ["string", "null"]
+            weatherConditions:
+              type: ["string", "null"]
+            safetyMeeting:
+              type: ["boolean", "null"]
+            additionalNotes:
+              type: ["string", "null"]
+            suggestedTimeEntries:
+              type: array
+              items:
+                type: object
+                properties:
+                  employeeName:
+                    type: string
+                  regularHours:
+                    type: number
+                  trade:
+                    type: string
+            suggestedMaterials:
+              type: array
+              items:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  quantity:
+                    type: number
+                  unit:
+                    type: string
+
+    # ── Dashboards ─────────────────────────────────────────────────────────
+    ForemanDashboard:
+      type: object
+      required: [todayReportStatus, recentReports, currentCrew, currentProject, draftCount]
+      properties:
+        todayReportStatus:
+          type: ["string", "null"]
+          enum: [draft, complete, null]
+        todayReportId:
+          type: ["integer", "null"]
+        draftCount:
+          type: integer
+        recentReports:
+          type: array
+          items:
+            $ref: "#/components/schemas/DailyReport"
+        currentCrew:
+          oneOf:
+            - $ref: "#/components/schemas/Crew"
+            - type: "null"
+        currentProject:
+          oneOf:
+            - $ref: "#/components/schemas/Project"
+            - type: "null"
+
+    SupervisorDashboard:
+      type: object
+      required: [pendingReviewCount, missingReportsCount, recentReports, recentIncidents]
+      properties:
+        pendingReviewCount:
+          type: integer
+        missingReportsCount:
+          type: integer
+        recentReports:
+          type: array
+          items:
+            $ref: "#/components/schemas/DailyReport"
+        recentIncidents:
+          type: array
+          items:
+            $ref: "#/components/schemas/DailyReport"
+        reportsByCrewCount:
+          type: array
+          items:
+            type: object
+            properties:
+              crewId:
+                type: integer
+              crewName:
+                type: string
+              reportCount:
+                type: integer
+
+    AdminDashboard:
+      type: object
+      required: [totalUsers, totalReports, completedReports, draftReports, totalProjects, totalCrews]
+      properties:
+        totalUsers:
+          type: integer
+        totalReports:
+          type: integer
+        completedReports:
+          type: integer
+        draftReports:
+          type: integer
+        totalProjects:
+          type: integer
+        totalCrews:
+          type: integer
+        recentReports:
+          type: array
+          items:
+            $ref: "#/components/schemas/DailyReport"
+        reportsByProject:
+          type: array
+          items:
+            type: object
+            properties:
+              projectId:
+                type: integer
+              projectName:
+                type: string
+              reportCount:
+                type: integer
