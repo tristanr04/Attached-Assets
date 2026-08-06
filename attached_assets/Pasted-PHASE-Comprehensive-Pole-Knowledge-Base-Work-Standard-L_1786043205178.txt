@@ -1,0 +1,1315 @@
+PHASE: Comprehensive Pole Knowledge Base, Work Standard Library, Visual Reference Training, and Company-Specific Billing Mapping
+
+Objective:
+
+Build a complete company-configurable pole knowledge system that allows administrators and qualified subject-matter experts to define every pole type, framing configuration, component, work action, construction standard, required documentation item, and corresponding company billing rule.
+
+The system must use this library when analyzing field photos.
+
+When a foreman takes or uploads pole photos, Redline should:
+
+1. Detect visible pole and line components.
+2. Compare the photos against the company’s visual reference library.
+3. Suggest the most likely pole configuration.
+4. Suggest the visible work that appears to have been completed.
+5. Match the result to one or more company work-package templates.
+6. Load the company’s required labor, equipment, materials, forms, photos, and billing items.
+7. Require foreman confirmation or correction.
+8. Run missing-charge and undercharge validation.
+9. Preserve the original AI suggestions and final human-approved record.
+
+Do not assume one universal pole catalog or billing system works for every contractor, utility, territory, or contract.
+
+Do not allow AI analysis to finalize pole specifications, quantities, work performed, or billing without authorized human approval.
+
+Do not add unrelated enterprise modules during this phase.
+
+==================================================
+1. POLE KNOWLEDGE CENTER
+==================================================
+
+Create a company administrator section called:
+
+“Pole Knowledge Center”
+
+Primary sections:
+
+- Pole Types
+- Construction Configurations
+- Components
+- Work Actions
+- Work Packages
+- Visual References
+- Billing Mappings
+- Required Documentation
+- Import and Export
+- Validation Testing
+
+The system must allow each company to build and maintain its own private knowledge base.
+
+Company A must not access Company B’s:
+
+- Pole standards
+- Photos
+- Templates
+- Pricing
+- Billing codes
+- Customer requirements
+- Recognition corrections
+
+==================================================
+2. POLE TYPE CATALOG
+==================================================
+
+Allow authorized users to define pole types using structured attributes.
+
+Pole attributes should support:
+
+Identification:
+
+- Company-specific pole type ID
+- Utility pole type ID
+- Customer standard ID
+- Construction standard number
+- Pole template name
+- Description
+- Aliases
+- Search keywords
+
+Physical characteristics:
+
+- Material
+- Wood
+- Steel
+- Concrete
+- Composite
+- Other
+- Nominal height
+- Height range
+- Pole class
+- Species
+- Manufacturer
+- Shape
+- Taper
+- Color
+- Treatment
+- Embedment standard
+- Top diameter
+- Ground-line circumference
+- Custom specifications
+
+Operational classification:
+
+- Distribution
+- Transmission
+- Subtransmission
+- Streetlight
+- Service
+- Communication
+- Joint-use
+- Temporary
+- Storm restoration
+- Other
+
+Location and access:
+
+- Roadside
+- Backyard
+- Alley
+- Off-road
+- Urban
+- Rural
+- Restricted access
+- Easement
+- Wetland
+- Mountainous terrain
+- Custom access type
+
+Metadata:
+
+- Customer
+- Contract
+- Territory
+- Effective date
+- Expiration date
+- Version
+- Active status
+- Created by
+- Approved by
+- Notes
+
+Allow unknown, optional, and custom attributes.
+
+==================================================
+3. STRUCTURE AND FRAMING CONFIGURATIONS
+==================================================
+
+Create a catalog of complete structure configurations.
+
+Examples:
+
+- Single-phase tangent
+- Single-phase dead-end
+- Three-phase tangent
+- Three-phase dead-end
+- Three-phase corner
+- Three-phase vertical construction
+- Three-phase horizontal construction
+- Armless construction
+- Single crossarm
+- Double crossarm
+- Buck-arm construction
+- H-frame
+- Running corner
+- Terminal structure
+- Tap structure
+- Riser pole
+- Transformer pole
+- Switch pole
+- Capacitor-bank pole
+- Regulator pole
+- Streetlight pole
+- Service pole
+- Joint-use pole
+- Custom structure
+
+Each structure configuration should include:
+
+- Name
+- Structure code
+- Construction standard
+- Number of phases
+- Conductor arrangement
+- Neutral arrangement
+- Crossarm configuration
+- Insulator configuration
+- Bracing
+- Dead-end configuration
+- Jumper configuration
+- Guying requirements
+- Grounding requirements
+- Attached equipment
+- Standard materials
+- Standard work actions
+- Required equipment
+- Required photos
+- Required forms
+- Visual reference images
+- Diagram or standard drawing
+- Customer
+- Contract
+- Version
+
+==================================================
+4. COMPONENT CATALOG
+==================================================
+
+Create a complete visible-component catalog.
+
+Pole and framing:
+
+- Pole
+- Pole top
+- Crossarm
+- Buck arm
+- Brace
+- Gain
+- Pole-top pin
+- Insulator
+- Dead-end
+- Suspension hardware
+- Jumper
+- Tie
+- Ground wire
+- Ground rod
+- Ground molding
+- Pole steps
+- Identification tag
+- Warning sign
+
+Transformer equipment:
+
+- Single transformer
+- Transformer bank
+- Platform
+- Transformer bracket
+- Secondary rack
+- Secondary bushings
+- Grounding
+- Wildlife protection
+
+Protection and switching:
+
+- Cutout
+- Arrester
+- Switch
+- Recloser
+- Sectionalizer
+- Fuse
+- Capacitor
+- Regulator
+- Metering equipment
+
+Guying and anchors:
+
+- Down guy
+- Side guy
+- Span guy
+- Sidewalk guy
+- Guy attachment
+- Guy insulator
+- Guy guard
+- Anchor
+- Expanding anchor
+- Screw anchor
+- Rock anchor
+- Deadman anchor
+
+Conductor and service:
+
+- Primary conductor
+- Neutral
+- Secondary
+- Service conductor
+- Triplex
+- Quadruplex
+- Spacer cable
+- Covered conductor
+- Underground riser
+- Conduit
+- Service attachment
+- Communication attachment
+
+Other equipment:
+
+- Streetlight
+- Communication cable
+- Fiber
+- Telephone
+- Cable television
+- Antenna
+- Signs
+- Animal guards
+- Custom components
+
+Each component should support:
+
+- Component code
+- Name
+- Aliases
+- Category
+- Visual description
+- Common variations
+- Allowed quantity
+- Customer standard
+- Related work actions
+- Related materials
+- Recognition examples
+- Negative examples
+- Active status
+
+==================================================
+5. WORK ACTION CATALOG
+==================================================
+
+Create structured work actions representing what can be done.
+
+Pole actions:
+
+- Install
+- Replace
+- Remove
+- Reset
+- Transfer
+- Top
+- Straighten
+- Brace
+- Abandon
+- Temporarily support
+- Dispose
+- Haul off
+
+Component actions:
+
+- Install
+- Replace
+- Remove
+- Transfer
+- Relocate
+- Reframe
+- Reconnect
+- Repair
+- Inspect
+- Test
+- Ground
+- Energize status confirmation
+- De-energize status confirmation
+- Other
+
+Allow combinations such as:
+
+- Install new pole
+- Remove existing pole
+- Transfer primary conductor
+- Transfer neutral
+- Transfer service
+- Transfer communication attachments
+- Install crossarm
+- Replace crossarm
+- Install transformer
+- Transfer transformer
+- Install down guy
+- Install anchor
+- Install cutout
+- Replace arrester
+- Install riser
+- Complete restoration
+
+Each work action should support:
+
+- Work-action code
+- Name
+- Component
+- Action type
+- Description
+- Typical visible evidence
+- Evidence that is not visually confirmable
+- Default quantity rule
+- Required human confirmation
+- Related billing items
+- Required documentation
+- Required equipment
+- Required materials
+- Required qualifications
+- Customer and contract scope
+
+==================================================
+6. COMPLETE WORK-PACKAGE BUILDER
+==================================================
+
+Allow companies to combine pole type, structure configuration, components, and work actions into reusable work packages.
+
+Examples:
+
+- 45-foot Class 3 single-phase pole replacement
+- 45-foot backyard pole replacement
+- 50-foot three-phase tangent pole replacement
+- Three-phase dead-end replacement
+- Pole replacement with transformer transfer
+- Three-transformer bank replacement
+- Existing-pole reframing
+- Anchor and guy installation
+- Storm pole replacement
+- Riser-pole replacement
+- Service-transfer package
+- Joint-use transfer package
+- New-construction structure
+- Custom company package
+
+Each work package must support:
+
+Identification:
+
+- Package name
+- Package code
+- Customer
+- Contract
+- Project type
+- Territory
+- Effective dates
+- Version
+
+Pole requirements:
+
+- Pole type
+- Material
+- Height
+- Class
+- Structure configuration
+- Access type
+
+Expected work:
+
+- Required work actions
+- Optional work actions
+- Conditional work actions
+- Default quantities
+- Minimum quantities
+- Maximum quantities
+
+Resources:
+
+- Default crew composition
+- Labor classifications
+- Equipment
+- Materials
+- Material kit
+- Mobilization requirements
+- Demobilization requirements
+
+Documentation:
+
+- Required before photos
+- Required after photos
+- Required detail photos
+- Required pole-tag photo
+- Required forms
+- Required signatures
+- Required GPS
+- Required customer signoff
+
+Billing:
+
+- Required billing codes
+- Suggested billing codes
+- Optional add-ons
+- Minimum charges
+- Rate rules
+- Quantity rules
+- Customer-specific overrides
+
+==================================================
+7. VISUAL REFERENCE LIBRARY
+==================================================
+
+Allow authorized users to attach reference photos to:
+
+- Pole types
+- Structure configurations
+- Components
+- Work actions
+- Work packages
+
+Reference image categories:
+
+- Full pole
+- Pole top
+- Pole tag
+- Pole base
+- Transformer
+- Framing
+- Guying
+- Anchor
+- Riser
+- Service
+- Before work
+- After work
+- Correct installation
+- Alternate variation
+- Commonly confused configuration
+- Negative example
+- Poor-quality example
+
+Each reference image should include:
+
+- Label
+- Company
+- Customer
+- Contract
+- Pole type
+- Structure configuration
+- Components visible
+- Work actions represented
+- Camera angle
+- Distance
+- Lighting condition
+- Image-quality rating
+- Source
+- Permission status
+- Approved for model evaluation
+- Approved for future training
+- Uploaded by
+- Verified by
+- Notes
+
+Do not automatically use customer photos for training.
+
+Require explicit company permission.
+
+==================================================
+8. REFERENCE SET REQUIREMENTS
+==================================================
+
+Allow companies to define required reference-image coverage.
+
+For a reliable visual record, recommend:
+
+- Multiple full-pole views
+- Multiple pole-top views
+- Pole-tag close-ups
+- Base and guying views
+- Transformer views
+- Before-and-after pairs
+- Multiple lighting conditions
+- Multiple distances
+- Multiple examples of the same configuration
+- Negative examples showing similar but different configurations
+
+Display coverage status:
+
+- No references
+- Insufficient references
+- Basic coverage
+- Good coverage
+- Strong coverage
+
+Do not claim a configuration is visually well-supported based on one image.
+
+==================================================
+9. BULK IMPORT
+==================================================
+
+Create import workflows for:
+
+- Pole types
+- Structure configurations
+- Components
+- Work actions
+- Work packages
+- Billing mappings
+- Material kits
+- Required forms
+- Reference-image metadata
+
+Support:
+
+- CSV
+- XLSX
+- ZIP-style image packages when safely supported
+- Manual entry
+
+Import workflow:
+
+1. Upload file.
+2. Select sheet.
+3. Map columns.
+4. Preview records.
+5. Validate references.
+6. Detect duplicates.
+7. Show row-level errors.
+8. Confirm import.
+9. Produce results report.
+
+Allow reusable mapping profiles.
+
+==================================================
+10. STANDARD DRAWING AND DOCUMENT IMPORT
+==================================================
+
+Allow administrators to attach:
+
+- Construction standards
+- Pole sheets
+- Framing diagrams
+- Customer standard drawings
+- Charge sheets
+- Work instructions
+- Material lists
+- Inspection checklists
+
+Supported documents may include:
+
+- PDF
+- Image
+- CSV
+- XLSX
+- Other approved files
+
+The system should allow manual linking between documents and structured records.
+
+Do not assume document extraction is correct without review.
+
+If AI extraction is available:
+
+- Extract possible pole types
+- Extract construction codes
+- Extract work items
+- Extract materials
+- Extract billing codes
+- Show confidence
+- Require administrator confirmation
+
+==================================================
+11. BILLING MAPPING CENTER
+==================================================
+
+Connect every work package and work action to company-specific billing.
+
+Each mapping should include:
+
+- Company
+- Customer
+- Contract
+- Project
+- Work action
+- Component
+- Pole type
+- Structure configuration
+- Billing code
+- Description
+- Unit type
+- Default quantity
+- Minimum quantity
+- Maximum quantity
+- Unit rate
+- Rate source
+- Effective date
+- Expiration date
+- Storm modifier
+- Emergency modifier
+- Mobilization requirement
+- Documentation requirement
+- Approval requirement
+
+Allow one work action to create several suggested billing items.
+
+Example:
+
+Confirmed pole replacement may suggest:
+
+- Pole installation
+- Existing pole removal
+- Disposal
+- Digger derrick
+- Bucket truck
+- Mobilization
+- Required labor
+- Required restoration
+
+==================================================
+12. CONDITIONAL BILLING RULES
+==================================================
+
+Support rules such as:
+
+IF:
+
+- Work action = Pole replacement
+- Access type = Backyard
+
+THEN SUGGEST:
+
+- Backyard machine
+- Specialty access charge
+- Mobilization
+- Additional labor or minimum hours
+- Required access photo
+
+IF:
+
+- Transformer transferred
+- Transformer count = 1
+
+THEN SUGGEST:
+
+- Single transformer transfer billing item
+- Transformer equipment charge
+- Required transformer photos
+
+IF:
+
+- Three-phase dead-end
+- Two down guys added
+
+THEN SUGGEST:
+
+- Dead-end structure code
+- Two guy-installation units
+- Two anchor units
+- Required base photos
+
+==================================================
+13. VISUAL CLASSIFICATION TAXONOMY
+==================================================
+
+Create a hierarchical classification system.
+
+Example hierarchy:
+
+Utility Structure
+→ Distribution
+→ Three Phase
+→ Tangent
+→ Horizontal Construction
+→ One Crossarm
+→ Transformer Present
+→ Roadside Access
+
+Work hierarchy:
+
+Work Performed
+→ Pole Work
+→ Replacement
+→ Existing Pole Removed
+→ New Pole Installed
+→ Conductors Transferred
+
+Component hierarchy:
+
+Component
+→ Protection
+→ Cutout
+→ Quantity 3
+→ Installed
+
+This taxonomy should drive:
+
+- AI output validation
+- Search
+- Templates
+- Billing rules
+- Analytics
+- Testing
+
+==================================================
+14. AI RETRIEVAL AND MATCHING
+==================================================
+
+When analyzing field photos, retrieve only the relevant company-approved knowledge.
+
+Use:
+
+- Current company
+- Customer
+- Contract
+- Project
+- Territory
+- Active pole types
+- Active work packages
+- Active billing mappings
+- Relevant visual references
+
+The model should compare the submitted photos against the company’s structured catalog and reference library.
+
+Do not send every company’s data to the model.
+
+Do not mix tenants.
+
+==================================================
+15. RECOGNITION PIPELINE
+==================================================
+
+Implement the recognition process in stages:
+
+Stage 1: Image quality
+
+- Pole visible
+- Multiple poles present
+- Full pole visible
+- Pole top visible
+- Pole tag readable
+- Base visible
+- Additional images required
+
+Stage 2: Component detection
+
+- Pole
+- Crossarms
+- Transformers
+- Cutouts
+- Arresters
+- Insulators
+- Conductors
+- Guys
+- Anchors
+- Risers
+- Services
+- Communication attachments
+- Other configured components
+
+Stage 3: Configuration classification
+
+- Pole type candidates
+- Structure configuration candidates
+- Matching visual references
+- Conflicting observations
+
+Stage 4: Work recognition
+
+- Visible installed components
+- Visible removed components
+- Visible transferred components
+- Before-and-after changes
+- Possible work actions
+
+Stage 5: Template matching
+
+- Best matching work package
+- Alternate work packages
+- Missing information
+
+Stage 6: Human confirmation
+
+- Foreman approval
+- Corrections
+- Rejections
+- Unknown values
+
+Stage 7: Billing rules
+
+- Suggested billing items
+- Missing-charge validation
+- Undercharge validation
+- Billing-user approval
+
+==================================================
+16. TRAINING DATASET BUILDER
+==================================================
+
+Create a controlled internal dataset-management tool.
+
+Allow authorized companies to create labeled examples from approved photos.
+
+Each labeled example should include:
+
+- Photos
+- Pole type
+- Structure configuration
+- Components present
+- Work actions completed
+- Quantities
+- Before-and-after relationship
+- Work package
+- Foreman-confirmed values
+- Supervisor-confirmed values
+- Billing-approved values
+- Model suggestion
+- Corrections
+- Approval for evaluation
+- Approval for training
+
+Dataset statuses:
+
+- Unreviewed
+- Foreman reviewed
+- Supervisor reviewed
+- Expert verified
+- Approved for evaluation
+- Approved for training
+- Rejected
+
+Do not use unreviewed records as ground truth.
+
+==================================================
+17. EXPERT VERIFICATION
+==================================================
+
+Create an expert-review role.
+
+Possible reviewers:
+
+- Experienced foreman
+- General foreman
+- Superintendent
+- Construction standards specialist
+- Billing specialist
+- Company administrator
+
+Expert reviewers can:
+
+- Verify pole type
+- Verify structure configuration
+- Verify visible components
+- Verify work actions
+- Verify quantities
+- Verify template match
+- Verify billing mapping
+- Mark photo set insufficient
+
+Preserve all review history.
+
+==================================================
+18. ACTIVE LEARNING QUEUE
+==================================================
+
+Create a review queue for cases that improve the knowledge base.
+
+Prioritize:
+
+- Low-confidence analyses
+- Foreman corrections
+- Conflicting reviewer decisions
+- Unknown pole configurations
+- Frequently misclassified components
+- New customer standards
+- Unmatched work packages
+- Rejected billing suggestions
+
+Allow verified corrections to become new reference examples only after approval.
+
+==================================================
+19. ACCURACY MEASUREMENT
+==================================================
+
+Measure accuracy separately for:
+
+- Pole detection
+- Material classification
+- Height-range suggestion
+- Pole-class extraction from tag
+- Structure configuration
+- Component presence
+- Component quantity
+- Work-action recognition
+- Before-and-after change detection
+- Work-package matching
+- Billing-item suggestion
+
+Track:
+
+- Precision
+- Recall
+- Approval rate
+- Correction rate
+- Rejection rate
+- Unknown rate
+- Confidence calibration
+- Performance by model version
+- Performance by customer
+- Performance by photo category
+
+Do not present one overall accuracy number that hides weak categories.
+
+==================================================
+20. GOLDEN TEST LIBRARY
+==================================================
+
+Create a versioned test library containing expert-verified fictional or authorized examples.
+
+Test categories:
+
+- Single-phase tangent
+- Single-phase dead-end
+- Three-phase tangent
+- Three-phase dead-end
+- Corner structure
+- Transformer pole
+- Three-transformer bank
+- Backyard pole
+- Riser pole
+- Guyed pole
+- Storm replacement
+- New construction
+- Reframing
+- Service transfer
+- Communication transfer
+- Poor image
+- Multiple poles
+- Obstructed pole
+- Unknown configuration
+
+For every case define:
+
+- Expected pole attributes
+- Expected components
+- Expected work actions
+- Expected quantities
+- Expected template candidates
+- Expected billing suggestions
+- Allowed uncertainty
+
+==================================================
+21. MANUAL CATALOG ENTRY EXPERIENCE
+==================================================
+
+Create a fast administrator workflow.
+
+Allow:
+
+- Create from blank
+- Duplicate existing pole type
+- Duplicate work package
+- Copy to another customer
+- Copy to another contract
+- Bulk edit
+- Add visual references
+- Add billing mappings
+- Preview foreman workflow
+- Run test recognition
+- Activate
+
+Use step-by-step forms instead of one massive form.
+
+==================================================
+22. COMPANY SETUP WIZARD
+==================================================
+
+Add a setup wizard:
+
+Step 1:
+Import customers and contracts
+
+Step 2:
+Import charge sheets
+
+Step 3:
+Create or import pole types
+
+Step 4:
+Create structure configurations
+
+Step 5:
+Create components and work actions
+
+Step 6:
+Create work packages
+
+Step 7:
+Attach billing mappings
+
+Step 8:
+Upload visual references
+
+Step 9:
+Configure required photos and forms
+
+Step 10:
+Run test scenarios
+
+Step 11:
+Approve and activate configuration
+
+Show setup completeness.
+
+==================================================
+23. CONFIGURATION VALIDATION
+==================================================
+
+Before activation, detect:
+
+- Work package with no pole type
+- Work action with no billing mapping
+- Billing code with no rate
+- Expired pricing
+- Required equipment missing
+- Required form missing
+- Required photo category undefined
+- Duplicate structure code
+- Conflicting quantity rules
+- Circular conditional rules
+- Template referencing archived component
+- Visual reference missing labels
+- Unsupported custom field
+
+Block activation only for critical errors.
+
+Show warnings for incomplete optional coverage.
+
+==================================================
+24. TEMPLATE PREVIEW AND SIMULATION
+==================================================
+
+Allow administrators to select:
+
+- Pole type
+- Structure configuration
+- Work actions
+- Quantities
+- Customer
+- Contract
+- Access type
+- Storm status
+
+Then simulate:
+
+- Suggested work package
+- Labor
+- Equipment
+- Materials
+- Billing items
+- Required photos
+- Required forms
+- Estimated billing
+- Missing-charge warnings
+- Approval requirements
+
+Do not require real reports for configuration testing.
+
+==================================================
+25. SEARCH AND FILTERING
+==================================================
+
+Support fast search across:
+
+- Pole types
+- Structure codes
+- Customer standards
+- Components
+- Work actions
+- Work packages
+- Billing codes
+- Materials
+- Reference photos
+
+Filters:
+
+- Customer
+- Contract
+- Pole material
+- Height
+- Class
+- Phase
+- Structure type
+- Transformer configuration
+- Access type
+- Active status
+- Version
+- Visual coverage
+
+==================================================
+26. VERSIONING
+==================================================
+
+Version:
+
+- Pole types
+- Structure configurations
+- Work actions
+- Work packages
+- Billing mappings
+- Reference sets
+- Recognition rules
+
+When an active record changes:
+
+- Create a new draft version.
+- Preserve the old active version.
+- Do not alter submitted reports.
+- Do not alter approved billing.
+- Activate only after validation.
+
+==================================================
+27. IMPORT AND CONFIGURATION AUDIT
+==================================================
+
+Record:
+
+- Record created
+- Record changed
+- Record activated
+- Record archived
+- Import performed
+- Mapping changed
+- Reference image added
+- Label changed
+- Billing mapping changed
+- Training approval changed
+- Expert verification
+
+Include:
+
+- User
+- Company
+- Previous value
+- New value
+- Reason
+- Timestamp
+
+==================================================
+28. SECURITY
+==================================================
+
+Verify:
+
+- Company knowledge bases are isolated.
+- Visual references are private.
+- Pricing is permission-protected.
+- Training approval is restricted.
+- Expert review is permission-protected.
+- Files require authorization.
+- Temporary URLs expire.
+- Imports are validated.
+- Model requests use only current-company data.
+- Customer photos are not used for training without opt-in.
+- Audit records cannot be deleted by ordinary users.
+
+==================================================
+29. AUTOMATED TESTING
+==================================================
+
+Add tests for:
+
+- Pole-type creation
+- Structure creation
+- Component creation
+- Work-action creation
+- Work-package composition
+- Billing mapping
+- Conditional rules
+- Bulk imports
+- Duplicate detection
+- Configuration validation
+- Versioning
+- Visual-reference labels
+- Company isolation
+- Recognition retrieval scope
+- Pole classification
+- Component detection
+- Work-action suggestion
+- Template matching
+- Billing suggestions
+- Foreman confirmation
+- Expert verification
+- Dataset approval
+- Active-learning queue
+- Accuracy metrics
+- Golden test cases
+- Mobile administration
+- Permission enforcement
+
+==================================================
+30. COMPLETION REQUIREMENTS
+==================================================
+
+Do not stop after creating database tables or empty administrator screens.
+
+Deliver working:
+
+- Pole Knowledge Center
+- Pole type catalog
+- Structure configuration catalog
+- Component catalog
+- Work-action catalog
+- Complete work-package builder
+- Visual reference library
+- Bulk import
+- Standard document linking
+- Billing mapping center
+- Conditional billing rules
+- Visual taxonomy
+- Company-scoped AI retrieval
+- Staged recognition pipeline
+- Training dataset builder
+- Expert verification
+- Active-learning queue
+- Accuracy dashboard
+- Golden test library
+- Setup wizard
+- Configuration validation
+- Simulation tools
+- Versioning
+- Audit history
+- Automated tests
+
+At completion, report:
+
+1. Pole attributes supported
+2. Structure configurations supported
+3. Component types supported
+4. Work actions supported
+5. Import templates and formats
+6. Visual-reference requirements
+7. Recognition pipeline behavior
+8. Foreman confirmation behavior
+9. Expert-verification behavior
+10. Billing-mapping behavior
+11. Company-isolation protections
+12. Tests completed and results
+13. Features that still require a configured vision provider
+14. Exact steps for entering the first complete company pole library
+15. Recommended amount and variety of reference photos per configuration
+16. Known limitations
+
+Primary success condition:
+
+An authorized company user can define or import its full pole, structure, component, work-action, work-package, documentation, and billing catalog; attach expert-verified visual examples; and use that private knowledge base to help Redline recognize a photographed pole, suggest the visible work completed, and generate company-specific billing recommendations that remain subject to foreman and billing approval.
