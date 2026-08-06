@@ -1,0 +1,1077 @@
+PHASE: Charge Sheet Import, Billing Rules Engine, Revenue-Leakage Detection, and Approval Workflow
+
+Objective:
+
+Turn the application into a company-configurable billing and field-production system that helps foremen complete paperwork faster while reducing missed, incorrect, or undercharged billable items.
+
+The company must be able to upload or manually configure its own charge sheets, unit prices, labor charges, equipment charges, customer contracts, and billing rules.
+
+The app must then use those company-specific rules to:
+
+- Pre-fill daily reports
+- Suggest expected billable items
+- Calculate estimated charges
+- Detect potentially missing charges
+- Detect undercharging
+- Flag conflicting selections
+- Preserve a complete audit history
+- Route reports through review and approval
+
+Do not hard-code one contractor’s prices, customer terms, or billing rules.
+
+Do not remove or break existing:
+
+- Authentication
+- Company onboarding
+- Crews
+- Projects
+- Daily reports
+- Labor entries
+- Equipment entries
+- Work-package templates
+- Mobile layouts
+- Existing permissions
+- Existing database records
+
+Before implementation:
+
+1. Inspect the existing database and code.
+2. Confirm which models already exist.
+3. Extend existing models instead of duplicating them.
+4. Create safe database migrations.
+5. Preserve all current user and demo data.
+6. Run the existing test suite before making changes.
+7. Fix any existing blocking errors first.
+
+==================================================
+1. COMPANY CHARGE SHEET MANAGEMENT
+==================================================
+
+Create a secure company-admin section called:
+
+“Charge Sheets & Billing Rules”
+
+Allow each company to manage multiple charge sheets.
+
+Examples:
+
+- PSO Distribution Contract 2026
+- AEP Storm Contract
+- Municipal Utility Contract
+- Standard Company Rate Sheet
+- Emergency Restoration Rate Sheet
+- Transmission Construction Contract
+
+Each charge sheet should include:
+
+- Company ID
+- Charge-sheet name
+- Customer
+- Contract name
+- Contract number
+- Service territory
+- Effective date
+- Expiration date
+- Currency
+- Status
+- Version number
+- Approval status
+- Notes
+- Created by
+- Approved by
+- Created timestamp
+- Updated timestamp
+- Archived timestamp
+
+Statuses:
+
+- Draft
+- Active
+- Scheduled
+- Expired
+- Archived
+
+Only one active version of the same customer contract should apply to a report at a time unless an administrator explicitly configures otherwise.
+
+Never delete historical charge-sheet versions that were used on submitted or approved reports.
+
+==================================================
+2. CHARGE SHEET IMPORT
+==================================================
+
+Build a reliable import workflow supporting:
+
+- CSV
+- XLSX
+- Manual entry
+
+The import process must include:
+
+1. File selection
+2. Sheet selection when an XLSX contains multiple sheets
+3. Header detection
+4. Column mapping
+5. Data preview
+6. Validation
+7. Duplicate detection
+8. Error summary
+9. Confirmation
+10. Import result report
+
+Support mapping columns such as:
+
+- Item code
+- Item name
+- Description
+- Category
+- Unit type
+- Base rate
+- Overtime rate
+- Double-time rate
+- Storm rate
+- Emergency rate
+- Mobilization rate
+- Standby rate
+- Minimum quantity
+- Maximum quantity
+- Customer
+- Contract
+- Effective date
+- Notes
+
+Allow the administrator to save a reusable column-mapping profile.
+
+Example:
+
+“PSO Charge Sheet Import Format”
+
+The next time a file with the same format is uploaded, automatically suggest the saved mapping.
+
+Do not automatically save imported data until the administrator confirms the final preview.
+
+Display exact row-level errors.
+
+Examples:
+
+- Missing billing code
+- Duplicate billing code
+- Invalid amount
+- Invalid date
+- Unknown category
+- Conflicting unit type
+- Blank required value
+- Duplicate item already in active charge sheet
+
+Allow valid rows to be imported while invalid rows remain in an error report only if the administrator chooses partial import.
+
+==================================================
+3. BILLABLE ITEM CATEGORIES
+==================================================
+
+Support configurable categories including:
+
+- Labor
+- Equipment
+- Pole work
+- Transformer work
+- Framing
+- Guying
+- Anchors
+- Conductor
+- Services
+- Meters
+- Underground work
+- Storm work
+- Traffic control
+- Mobilization
+- Demobilization
+- Materials
+- Per diem
+- Travel
+- Standby
+- Inspection
+- Testing
+- Add-on charges
+- Credits
+- Custom category
+
+Each charge-sheet item should support:
+
+- Billing code
+- Customer code
+- Internal company code
+- Name
+- Description
+- Category
+- Subcategory
+- Unit type
+- Unit rate
+- Alternate rate types
+- Minimum billable quantity
+- Maximum billable quantity
+- Rounding rule
+- Required documentation
+- Required photo count
+- Required approval level
+- Active status
+- Effective dates
+- Tax treatment if applicable
+- Notes
+
+Unit types should include:
+
+- Each
+- Hour
+- Crew hour
+- Employee hour
+- Day
+- Mile
+- Foot
+- Pole
+- Transformer
+- Span
+- Service
+- Structure
+- Trip
+- Mobilization
+- Flat rate
+- Percentage
+- Custom unit
+
+==================================================
+4. CONTRACT-SPECIFIC PRICING
+==================================================
+
+Allow the same item to have different rates depending on:
+
+- Customer
+- Contract
+- Project
+- Work type
+- Storm status
+- Emergency status
+- Weekday or weekend
+- Day or night
+- Regular time
+- Overtime
+- Double time
+- Geographic area
+- Effective date
+
+Example:
+
+Billing code P-45-C3 may have:
+
+- Standard contract rate
+- Storm rate
+- Emergency rate
+- Weekend rate
+- Customer-specific override
+
+Create a clear precedence system.
+
+Recommended precedence:
+
+1. Report-specific authorized override
+2. Project-specific rate
+3. Customer-contract rate
+4. Charge-sheet default rate
+5. Company default rate
+
+Display which rule supplied the final rate.
+
+Never silently choose between conflicting rates.
+
+If two rules have equal priority, flag the conflict and require review.
+
+==================================================
+5. BILLING RULES ENGINE
+==================================================
+
+Build a configurable rules engine.
+
+The rules engine must allow administrators to define:
+
+WHEN:
+- A work item is selected
+- A pole type is selected
+- A transformer type is selected
+- A piece of equipment is used
+- A labor classification is present
+- Work occurs during storm conditions
+- Work occurs after normal hours
+- A specific customer or contract is selected
+- A quantity exceeds a threshold
+- A report includes a certain work type
+- A report includes a certain material
+- A report is created for a specific project
+
+THEN:
+- Add a suggested billing code
+- Add a required billing code
+- Add a default quantity
+- Add equipment
+- Add labor classification
+- Add a required document
+- Require a photo
+- Require supervisor approval
+- Display a warning
+- Block final submission
+- Apply a rate override
+- Apply a minimum charge
+- Apply a multiplier
+- Add an associated work item
+
+Example rules:
+
+WHEN:
+45-foot Class 3 pole replacement is selected
+
+THEN SUGGEST:
+- Pole installation charge
+- Pole removal charge
+- Framing package
+- Digger derrick usage
+- Bucket truck usage
+- Disposal or haul-off charge
+- Associated labor classifications
+
+Another example:
+
+WHEN:
+Backyard machine is selected
+
+THEN REQUIRE:
+- Equipment billing code
+- Usage hours or daily quantity
+- Mobilization selection
+- Work-location explanation
+
+Another example:
+
+WHEN:
+Storm status is active
+
+THEN:
+- Apply storm charge sheet
+- Suggest storm labor rates
+- Suggest storm equipment rates
+- Require storm event identifier
+
+==================================================
+6. RULE BUILDER INTERFACE
+==================================================
+
+Create an administrator-friendly rule builder.
+
+The user should not need to write code.
+
+Use a guided format:
+
+IF
+[Condition field]
+[Operator]
+[Value]
+
+AND/OR
+[Additional condition]
+
+THEN
+[Action]
+[Configured value]
+
+Support:
+
+- Multiple conditions
+- Multiple actions
+- Rule priority
+- Effective dates
+- Active or inactive status
+- Test mode
+- Rule description
+- Rule owner
+- Last modified date
+
+Provide a rule-testing screen.
+
+An administrator should be able to create a sample report and see:
+
+- Which rules fired
+- Which items were added
+- Which warnings appeared
+- Which rate was selected
+- Why each action happened
+
+==================================================
+7. WORK-PACKAGE BILLING TEMPLATES
+==================================================
+
+Connect existing work-package templates to the charge sheets.
+
+Each work package should support:
+
+- Work-package name
+- Customer
+- Contract
+- Pole type
+- Structure type
+- Work description
+- Default labor
+- Default equipment
+- Default materials
+- Default billing codes
+- Required billing codes
+- Optional billing codes
+- Add-on items
+- Required photos
+- Required signatures
+- Required safety documents
+- Default quantities
+- Calculation rules
+- Validation rules
+
+Examples:
+
+- 40-foot Class 4 Pole Replacement
+- 45-foot Class 3 Pole Replacement
+- 50-foot Class 2 Pole Replacement
+- Single-Phase Transformer Changeout
+- Three-Phase Bank Changeout
+- New Anchor Installation
+- Guy Replacement
+- Service Transfer
+- Storm Pole Restoration
+- Backyard Access Pole Replacement
+- New Distribution Construction
+
+When a foreman chooses a work package:
+
+1. Load the company-configured defaults.
+2. Add associated billable items.
+3. Add default equipment.
+4. Add required documentation.
+5. Calculate estimated billing.
+6. Allow the foreman to modify the actual quantities.
+7. Run missing-charge validation.
+
+The foreman should only need to change what was different.
+
+==================================================
+8. COPY AND REUSE WORKFLOWS
+==================================================
+
+Add fast-start options when creating a report:
+
+- Use today’s crew defaults
+- Copy yesterday’s report
+- Copy previous report
+- Use project defaults
+- Use work-package template
+- Use saved favorite
+- Start blank
+
+When copying a report:
+
+- Create a new independent report
+- Preserve the original report
+- Reset the date
+- Reset signatures
+- Reset approval status
+- Reset submission timestamps
+- Reset incident confirmation
+- Mark copied quantities for review
+- Re-run current billing rules
+- Use the correct charge-sheet version for the new date
+
+Display a warning when the copied report uses rates that have changed since the original report.
+
+==================================================
+9. REVENUE-LEAKAGE DETECTION
+==================================================
+
+Create a report validation system specifically designed to find potentially missed revenue.
+
+Check for:
+
+- Work selected without a billing code
+- Equipment used without a charge
+- Labor hours without a labor classification
+- Overtime hours billed at regular rate
+- Double-time hours billed at overtime or regular rate
+- Storm work without storm rates
+- Mobilization missing
+- Demobilization missing
+- Minimum quantity not met
+- Required associated charge missing
+- Pole replacement missing removal or disposal charge
+- Transformer work missing associated installation charge
+- Backyard equipment missing specialty-equipment charge
+- Work quantity not matching selected template
+- Material used without associated work item
+- Duplicate charges
+- Rate lower than the active contract rate
+- Expired rate used
+- Wrong customer charge sheet selected
+- Incorrect unit type
+- Manual price override below allowed threshold
+- Required documentation missing
+
+Classify issues as:
+
+- Informational
+- Warning
+- High priority
+- Submission blocker
+
+Each issue should show:
+
+- What may be wrong
+- Why it was flagged
+- Related item
+- Expected rule
+- Current value
+- Suggested correction
+- Estimated financial difference
+- Whether supervisor approval is required
+
+Do not automatically change final billing values without human review.
+
+==================================================
+10. UNDERCHARGE DETECTION
+==================================================
+
+Compare the calculated report against the applicable active charge sheet.
+
+Flag cases where:
+
+- The entered rate is below the contract rate
+- The quantity is below a configured minimum
+- A required multiplier was not applied
+- Storm or emergency rates were omitted
+- A customer-specific rate was not used
+- The foreman selected an outdated billing code
+- A manual override reduced the charge
+- Required associated equipment or labor was omitted
+
+Display:
+
+- Current estimated billing
+- Expected billing based on configured rules
+- Difference
+- Percentage difference
+- Items causing the difference
+
+Example:
+
+Current estimated total: $8,420
+Expected configured total: $9,180
+Potential undercharge: $760
+
+This must be labeled:
+
+“Potential billing difference — requires review”
+
+Do not claim the amount is guaranteed lost revenue.
+
+==================================================
+11. REPORT REVIEW AND APPROVAL WORKFLOW
+==================================================
+
+Create configurable report statuses:
+
+- Draft
+- Ready for foreman review
+- Submitted
+- Needs correction
+- Supervisor approved
+- Billing review
+- Billing approved
+- Exported
+- Archived
+
+Workflow:
+
+1. Foreman completes the report.
+2. The system runs billing and documentation validation.
+3. Foreman resolves or acknowledges warnings.
+4. Foreman submits.
+5. Supervisor reviews work details.
+6. Billing reviewer reviews charges.
+7. Authorized approver approves final billing.
+8. Report becomes locked except for authorized amendment.
+
+Allow companies to configure which approval stages are required.
+
+Add comments and correction requests.
+
+Example:
+
+“Digger derrick hours entered as 4. Crew report shows 10 working hours. Please confirm.”
+
+==================================================
+12. MANUAL OVERRIDES
+==================================================
+
+Allow authorized users to override:
+
+- Rate
+- Quantity
+- Billing code
+- Work package
+- Rule result
+- Required item
+- Charge-sheet selection
+
+Every override must require:
+
+- Reason
+- User identity
+- Timestamp
+- Previous value
+- New value
+- Approval status
+
+Support permission levels:
+
+- Foreman can request an override
+- Supervisor can approve certain overrides
+- Billing administrator can approve financial overrides
+- Company administrator can approve all overrides
+
+Do not allow unlogged financial overrides.
+
+==================================================
+13. REPORT LOCKING AND AMENDMENTS
+==================================================
+
+Once approved:
+
+- Lock the original report
+- Prevent ordinary editing
+- Preserve the exact charge-sheet version used
+- Preserve the exact rate values used
+- Preserve the rule results
+- Preserve approval history
+
+To modify an approved report, create an amendment.
+
+An amendment should include:
+
+- Amendment number
+- Original report ID
+- Reason
+- Changes made
+- Financial difference
+- Requested by
+- Approved by
+- Timestamp
+
+Never overwrite approved historical values.
+
+==================================================
+14. BILLING SUMMARY
+==================================================
+
+Create a detailed report billing summary.
+
+Sections:
+
+Labor:
+- Regular
+- Overtime
+- Double time
+- Storm
+- Travel
+- Per diem
+
+Equipment:
+- Hourly
+- Daily
+- Standby
+- Mobilization
+- Demobilization
+- Storm
+- Emergency
+
+Work units:
+- Pole work
+- Transformer work
+- Framing
+- Guying
+- Anchors
+- Conductor
+- Services
+- Other configured categories
+
+Materials:
+- Billable materials
+- Non-billable materials
+- Customer-provided materials
+
+Totals:
+- Labor total
+- Equipment total
+- Work-unit total
+- Material total
+- Add-on total
+- Credits
+- Estimated report total
+- Potential missing charges
+- Potential undercharge
+- Approved total
+
+Pricing must only be visible to authorized roles.
+
+==================================================
+15. COMPANY REVENUE-LEAKAGE DASHBOARD
+==================================================
+
+Create an administrative dashboard showing:
+
+- Reports submitted
+- Reports requiring correction
+- Reports with missing-charge warnings
+- Reports with potential undercharges
+- Total potential billing difference
+- Billing difference by crew
+- Billing difference by foreman
+- Billing difference by project
+- Billing difference by customer
+- Most frequently missed billing codes
+- Most frequently missed equipment charges
+- Most frequently overridden rates
+- Average approval time
+- Reports awaiting approval
+
+Allow filtering by:
+
+- Date range
+- Customer
+- Contract
+- Project
+- Crew
+- Foreman
+- Supervisor
+- Billing status
+- Severity
+
+Do not label potential differences as recovered revenue until the amount is actually reviewed and approved.
+
+Track separate values:
+
+- Potential billing difference
+- Confirmed correction
+- Approved added billing
+- Dismissed warning
+
+==================================================
+16. FOREMAN TRAINING ASSISTANCE
+==================================================
+
+Add contextual guidance for new foremen.
+
+When a user selects a work item, display:
+
+- Standard associated billing items
+- Required documentation
+- Commonly missed items
+- Company notes
+- Examples
+- Required equipment
+- Required approval steps
+
+Keep guidance short and field-friendly.
+
+Do not overwhelm experienced users.
+
+Allow each user to choose:
+
+- Guided mode
+- Standard mode
+- Fast-entry mode
+
+Guided mode:
+- Explains expected items
+
+Standard mode:
+- Shows warnings only
+
+Fast-entry mode:
+- Prioritizes templates, defaults, and copy features
+
+Warnings and required validation must still operate in every mode.
+
+==================================================
+17. OFFLINE AND POOR-CONNECTION SUPPORT
+==================================================
+
+Prepare daily report entry for unreliable field connectivity.
+
+Support:
+
+- Local draft caching
+- Visible offline status
+- Retry queue
+- Conflict detection
+- Safe synchronization
+- Upload retry for photos
+- Prevention of duplicate report submission
+
+Do not store sensitive company pricing in unsecured local storage.
+
+Store only the minimum encrypted or protected data necessary for offline operation.
+
+If true secure offline support cannot be completed safely in this phase, implement the architecture and clearly document the limitation.
+
+==================================================
+18. MOBILE USABILITY
+==================================================
+
+Optimize all new features for phones.
+
+Requirements:
+
+- Large tap targets
+- No horizontal scrolling
+- Searchable dropdowns
+- Recent selections
+- Favorites
+- Number stepper controls
+- Quick quantities
+- Sticky report total when authorized
+- Collapsible billing sections
+- Clear warning banners
+- Minimal typing
+- Easy review before submission
+- Forms that remain visible above the mobile keyboard
+
+Test at:
+
+- 320px
+- 375px
+- 390px
+- 430px
+- Tablet
+- Desktop
+
+==================================================
+19. SECURITY AND COMPANY ISOLATION
+==================================================
+
+Verify:
+
+- Charge sheets are isolated by company
+- Contracts are isolated by company
+- Rates are isolated by company
+- Rules are isolated by company
+- Reports are isolated by company
+- Imported files are private
+- Pricing is hidden from unauthorized roles
+- Authorization is enforced server-side
+- Archived charge sheets cannot be modified
+- Approved reports cannot be modified without amendment
+- Audit logs cannot be deleted by ordinary users
+- Sensitive pricing is excluded from client responses when not authorized
+
+Add tests proving that Company A cannot access Company B’s:
+
+- Rates
+- Charge sheets
+- Contracts
+- Reports
+- Equipment
+- Labor charges
+- Rules
+- Billing summaries
+
+==================================================
+20. AUDIT LOGGING
+==================================================
+
+Record:
+
+- Charge-sheet upload
+- Charge-sheet activation
+- Rate change
+- Rule creation
+- Rule change
+- Work-package change
+- Report submission
+- Warning resolution
+- Warning dismissal
+- Rate override
+- Quantity override
+- Approval
+- Rejection
+- Amendment
+- Export
+
+Each log should include:
+
+- Company
+- User
+- Action
+- Record type
+- Record ID
+- Previous value
+- New value
+- Reason
+- Timestamp
+- IP or session information where appropriate
+
+==================================================
+21. TEST DATA
+==================================================
+
+Create fictional test data only.
+
+Demo customer:
+
+“Red River Electric Utility”
+
+Demo contract:
+
+“2026 Distribution Construction Agreement”
+
+Demo charge-sheet items:
+
+- 45-foot Class 3 pole installation
+- Existing pole removal
+- Digger derrick hourly charge
+- Bucket truck hourly charge
+- Backyard machine daily charge
+- Journeyman lineman regular hour
+- Journeyman lineman overtime hour
+- Apprentice regular hour
+- Foreman regular hour
+- Storm multiplier
+- Mobilization charge
+- Anchor installation
+- Guy installation
+- Transformer changeout
+
+Clearly label all rates and codes as fictional.
+
+Do not use real company pricing.
+
+==================================================
+22. AUTOMATED TESTING
+==================================================
+
+Add tests for:
+
+- CSV import
+- XLSX import
+- Column mapping
+- Invalid rows
+- Duplicate billing codes
+- Charge-sheet versioning
+- Effective dates
+- Rate precedence
+- Conflicting rates
+- Rule execution
+- Required billing items
+- Suggested billing items
+- Missing-charge detection
+- Undercharge detection
+- Storm rates
+- Overtime rates
+- Double-time rates
+- Minimum charges
+- Mobilization charges
+- Report copying
+- Current-rate recalculation
+- Approval workflow
+- Manual override permissions
+- Report locking
+- Amendments
+- Company isolation
+- Unauthorized pricing access
+- Revenue-leakage dashboard totals
+- Mobile rendering
+
+Include realistic edge cases:
+
+- Expired charge sheet
+- Report crossing a rate effective date
+- Multiple customer contracts
+- Missing quantity
+- Zero equipment hours
+- Duplicate equipment entry
+- Conflicting billing rules
+- Manual rate lower than contract rate
+- Copying an old report with obsolete rates
+- Approved report needing correction
+- Partial spreadsheet import
+- User losing connection during submission
+
+==================================================
+23. REGRESSION TESTING
+==================================================
+
+After implementation, test the entire existing application:
+
+- Registration
+- Login
+- Company creation
+- Crew creation
+- Project creation
+- Daily reports
+- Labor entry
+- Equipment entry
+- Templates
+- Copy yesterday
+- Mobile layout
+- Autosave
+- PDF or print output
+- Permissions
+- Database persistence
+- Error handling
+
+Fix all discovered regressions before completion.
+
+==================================================
+COMPLETION REQUIREMENTS
+==================================================
+
+Do not stop after creating screens or mock data.
+
+Deliver working:
+
+- Charge-sheet management
+- CSV/XLSX import
+- Column mapping
+- Charge-sheet versioning
+- Contract-specific rates
+- Billing rules engine
+- Rule builder
+- Work-package integration
+- Missing-charge detection
+- Undercharge detection
+- Approval workflow
+- Override workflow
+- Report locking
+- Amendments
+- Billing summaries
+- Revenue-leakage dashboard
+- Audit logging
+- Permissions
+- Automated tests
+
+At completion, provide:
+
+1. Features built
+2. Database migrations
+3. Import formats supported
+4. Billing rule behavior
+5. Rate-precedence logic
+6. Permissions implemented
+7. Tests completed
+8. Existing bugs fixed
+9. Features still mocked
+10. Known limitations
+11. Recommended next phase
+
+The primary success condition is:
+
+A company administrator can import a charge sheet, configure reusable work packages and billing rules, and a foreman can create a report using saved templates while the system identifies potentially missing or undercharged billable items before final approval.
