@@ -7,6 +7,7 @@ import {
   selectCompanyMembership,
 } from "../lib/requestValues";
 import { pickMutableReportFields } from "../lib/reportInput";
+import { validatePhotoDataUrl } from "../lib/photoDataUrl";
 
 test("parsePositiveId accepts only canonical positive integer strings", () => {
   assert.equal(parsePositiveId("1"), 1);
@@ -85,6 +86,46 @@ test("report routes bind project and crew references to the report company", asy
     /\.where\(and\(eq\(table\.id, id\), eq\(table\.companyId, companyId\)\)\)/,
   );
   assert.doesNotMatch(source, /foremanId:\s*req\.userId\s*\?\?\s*null,\s*\.\.\.rest/);
+});
+
+test("photo validation accepts fictional JPEG, PNG, and WebP byte fixtures", () => {
+  const fixtures = [
+    ["image/jpeg", Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00])],
+    ["image/png", Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])],
+    ["image/webp", Buffer.from("RIFF0000WEBP", "ascii")],
+  ] as const;
+
+  for (const [mimeType, bytes] of fixtures) {
+    const result = validatePhotoDataUrl(
+      `data:${mimeType};base64,${bytes.toString("base64")}`,
+    );
+    assert.deepEqual(result, {
+      valid: true,
+      mimeType,
+      size: bytes.length,
+    });
+  }
+});
+
+test("photo validation rejects spoofed, unsafe, malformed, and oversized data", () => {
+  const fakeJpeg = Buffer.from("not a jpeg").toString("base64");
+  const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00]).toString("base64");
+
+  for (const value of [
+    null,
+    ["data:image/jpeg;base64," + jpeg],
+    "data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=",
+    "data:text/html;base64,PGgxPm5vdCBhIHBob3RvPC9oMT4=",
+    "data:image/jpeg;base64,%%%",
+    "data:image/jpeg;base64," + fakeJpeg,
+  ]) {
+    assert.equal(validatePhotoDataUrl(value).valid, false);
+  }
+
+  assert.equal(
+    validatePhotoDataUrl("data:image/jpeg;base64," + jpeg, 4).valid,
+    false,
+  );
 });
 
 test("company selection never accepts a company outside the user's memberships", () => {

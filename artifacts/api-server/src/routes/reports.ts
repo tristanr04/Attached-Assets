@@ -7,6 +7,7 @@ import {
 } from "@workspace/db";
 import { requireAuth, type AuthenticatedRequest } from "../middlewares/requireAuth";
 import { pickMutableReportFields } from "../lib/reportInput";
+import { validatePhotoDataUrl } from "../lib/photoDataUrl";
 import { parsePositiveId } from "../lib/requestValues";
 
 const router: IRouter = Router();
@@ -458,7 +459,11 @@ router.post("/reports/:reportId/photos", requireAuth, async (req: AuthenticatedR
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
   const { dataUrl, caption, category } = req.body;
   if (!dataUrl) { res.status(400).json({ error: "dataUrl is required" }); return; }
-  if (!dataUrl.startsWith("data:image/")) { res.status(400).json({ error: "dataUrl must be a valid image data URL" }); return; }
+  const photoValidation = validatePhotoDataUrl(dataUrl);
+  if (!photoValidation.valid) {
+    res.status(400).json({ error: photoValidation.error });
+    return;
+  }
   const [photo] = await db.insert(photosTable).values({
     reportId,
     url: dataUrl,
