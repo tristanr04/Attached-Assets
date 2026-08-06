@@ -6,6 +6,8 @@ import {
   reportEquipmentTable, photosTable, signaturesTable
 } from "@workspace/db";
 import { requireAuth, type AuthenticatedRequest } from "../middlewares/requireAuth";
+import { pickMutableReportFields } from "../lib/reportInput";
+import { parsePositiveId } from "../lib/requestValues";
 
 const router: IRouter = Router();
 
@@ -13,6 +15,38 @@ async function checkAccess(clerkUserId: string, companyId: number) {
   const [m] = await db.select().from(companyMembershipsTable)
     .where(and(eq(companyMembershipsTable.companyId, companyId), eq(companyMembershipsTable.clerkUserId, clerkUserId)));
   return m;
+}
+
+async function normalizeReportReferences(
+  companyId: number,
+  values: Record<string, unknown>,
+): Promise<string | null> {
+  for (const [field, table] of [
+    ["projectId", projectsTable],
+    ["crewId", crewsTable],
+  ] as const) {
+    const rawValue = values[field];
+    if (rawValue === undefined || rawValue === null) {
+      continue;
+    }
+
+    const id = parsePositiveId(rawValue);
+    if (id === null) {
+      return `Invalid ${field}`;
+    }
+
+    const [record] = await db
+      .select({ id: table.id })
+      .from(table)
+      .where(and(eq(table.id, id), eq(table.companyId, companyId)));
+    if (!record) {
+      return `${field} must belong to the report company`;
+    }
+
+    values[field] = id;
+  }
+
+  return null;
 }
 
 async function enrichReport(r: typeof dailyReportsTable.$inferSelect) {
@@ -114,14 +148,23 @@ router.get("/reports", requireAuth, async (req: AuthenticatedRequest, res): Prom
 // ── Create report ─────────────────────────────────────────────────────────────
 router.post("/reports", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const { companyId, reportDate, ...rest } = req.body;
-  if (!companyId || !reportDate) { res.status(400).json({ error: "companyId and reportDate are required" }); return; }
+  const companyId = parsePositiveId(req.body?.companyId);
+  const reportDate = typeof req.body?.reportDate === "string" ? req.body.reportDate : null;
+  if (companyId === null || !reportDate) { res.status(400).json({ error: "companyId and reportDate are required" }); return; }
 
   const m = await checkAccess(req.clerkUserId, companyId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
 
+  const values = pickMutableReportFields(req.body);
+  delete values.reportDate;
+  const referenceError = await normalizeReportReferences(companyId, values);
+  if (referenceError) { res.status(400).json({ error: referenceError }); return; }
+
   const [report] = await db.insert(dailyReportsTable).values({
-    companyId, reportDate, foremanId: req.userId ?? null, ...rest,
+    companyId,
+    reportDate,
+    foremanId: req.userId ?? null,
+    ...values,
   }).returning();
   res.status(201).json(await enrichReport(report));
 });
@@ -168,13 +211,9 @@ router.patch("/reports/:reportId", requireAuth, async (req: AuthenticatedRequest
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
   if (report.status === "complete" && m.role === "foreman") { res.status(403).json({ error: "Cannot edit completed report" }); return; }
 
-  const allowed = ["projectId","crewId","reportDate","workLocation","generalForeman","startTime","stopTime",
-    "weatherConditions","workPerformed","structuresInstalled","safetyMeeting","safetyNotes",
-    "delays","outages","customerIssues","injuries","injuryDetails","additionalNotes"];
-  const updates: Record<string, unknown> = {};
-  for (const key of allowed) {
-    if (req.body[key] !== undefined) updates[key] = req.body[key];
-  }
+  const updates = pickMutableReportFields(req.body);
+  const referenceError = await normalizeReportReferences(report.companyId, updates);
+  if (referenceError) { res.status(400).json({ error: referenceError }); return; }
 
   const [updated] = await db.update(dailyReportsTable).set(updates).where(eq(dailyReportsTable.id, reportId)).returning();
   res.json(await enrichReport(updated));

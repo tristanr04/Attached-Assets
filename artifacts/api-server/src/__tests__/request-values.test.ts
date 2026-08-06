@@ -6,6 +6,7 @@ import {
   parsePositiveId,
   selectCompanyMembership,
 } from "../lib/requestValues";
+import { pickMutableReportFields } from "../lib/reportInput";
 
 test("parsePositiveId accepts only canonical positive integer strings", () => {
   assert.equal(parsePositiveId("1"), 1);
@@ -49,6 +50,41 @@ test("templates and work packages cannot be applied across companies", async () 
   );
 
   assert.equal(companyBoundaryGuards?.length, 2);
+});
+
+test("report input cannot overwrite ownership, workflow, or audit fields", () => {
+  const picked = pickMutableReportFields({
+    projectId: 3,
+    crewId: 4,
+    workPerformed: "Replaced crossarm",
+    companyId: 999,
+    foremanId: 999,
+    status: "complete",
+    completedAt: "2026-08-06T00:00:00Z",
+    id: 999,
+    createdAt: "2026-08-06T00:00:00Z",
+  });
+
+  assert.deepEqual(picked, {
+    projectId: 3,
+    crewId: 4,
+    workPerformed: "Replaced crossarm",
+  });
+});
+
+test("report routes bind project and crew references to the report company", async () => {
+  const source = await readFile(
+    new URL("../routes/reports.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(source, /\["projectId", projectsTable\]/);
+  assert.match(source, /\["crewId", crewsTable\]/);
+  assert.match(
+    source,
+    /\.where\(and\(eq\(table\.id, id\), eq\(table\.companyId, companyId\)\)\)/,
+  );
+  assert.doesNotMatch(source, /foremanId:\s*req\.userId\s*\?\?\s*null,\s*\.\.\.rest/);
 });
 
 test("company selection never accepts a company outside the user's memberships", () => {
