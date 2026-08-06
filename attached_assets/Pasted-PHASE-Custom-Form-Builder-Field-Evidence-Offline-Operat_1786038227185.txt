@@ -1,0 +1,1378 @@
+PHASE: Custom Form Builder, Field Evidence, Offline Operations, Customer Portals, and Pilot Deployment Readiness
+
+Objective:
+
+Prepare Redline for use by a real contractor during a controlled pilot.
+
+The application must support different companies, utilities, contracts, and paperwork requirements without requiring custom code for every customer.
+
+Build a company-configurable form and documentation system that allows administrators to recreate their existing paperwork, connect those forms to work packages and billing rules, collect reliable field evidence, and securely share approved information with customers.
+
+This phase must also improve:
+
+- Offline field reliability
+- Photo and document evidence
+- GPS and timestamp verification
+- Digital signatures
+- Custom forms
+- Customer-specific submission packages
+- Crew onboarding
+- Pilot administration
+- Data import and export
+- Production monitoring
+- Security and auditability
+
+Do not remove, replace, or break existing:
+
+- Authentication
+- Company onboarding
+- Company isolation
+- Users and roles
+- Crews
+- Projects
+- Daily reports
+- Labor entries
+- Equipment entries
+- Materials
+- Work-package templates
+- Charge sheets
+- Billing rules
+- Missing-charge detection
+- Undercharge detection
+- Approvals
+- Production tracking
+- Job costing
+- Invoice preparation
+- Change orders
+- T&M tickets
+- Audit history
+- Existing database records
+
+Before implementation:
+
+1. Inspect the entire repository.
+2. Review the current database schema and migrations.
+3. Identify existing form, report, photo, signature, and document models.
+4. Extend existing systems rather than duplicating them.
+5. Run all current tests.
+6. Record existing failures.
+7. Fix blocking bugs before adding new functionality.
+8. Create safe backward-compatible migrations.
+9. Preserve approved reports and historical financial values.
+10. Do not reset the database.
+
+==================================================
+1. COMPANY FORM TEMPLATE BUILDER
+==================================================
+
+Create an administrator section called:
+
+“Forms & Documentation”
+
+Allow each company to build reusable digital forms without writing code.
+
+A form template should support:
+
+- Company
+- Form name
+- Description
+- Category
+- Customer
+- Contract
+- Project type
+- Work type
+- Version number
+- Effective date
+- Expiration date
+- Draft or active status
+- Required approval level
+- Required signature roles
+- Instructions
+- Created by
+- Approved by
+- Created timestamp
+- Updated timestamp
+- Archived timestamp
+
+Example form categories:
+
+- Daily report
+- Tailboard
+- Job safety analysis
+- Equipment inspection
+- Vehicle inspection
+- Material receipt
+- Pole inspection
+- Transformer record
+- Outage report
+- Damage report
+- Incident report
+- Near-miss report
+- Customer signoff
+- T&M ticket
+- Storm report
+- Production report
+- Environmental report
+- Quality-control checklist
+- Custom form
+
+Do not hard-code one company’s paperwork into the application.
+
+==================================================
+2. DRAG-AND-DROP FORM BUILDER
+==================================================
+
+Create a mobile-friendly form builder for company administrators.
+
+Supported field types:
+
+- Short text
+- Long text
+- Number
+- Currency
+- Quantity
+- Date
+- Time
+- Date and time
+- Checkbox
+- Yes or no
+- Single-select dropdown
+- Multi-select
+- Searchable catalog selector
+- Employee selector
+- Crew selector
+- Equipment selector
+- Material selector
+- Work-package selector
+- Billing-code selector
+- Customer selector
+- Project selector
+- Address
+- GPS location
+- Photo
+- Multiple photos
+- File upload
+- Signature
+- Initials
+- Calculation
+- Informational text
+- Section heading
+- Repeating table
+- Custom field
+
+Allow administrators to:
+
+- Add fields
+- Remove fields
+- Reorder fields
+- Group fields into sections
+- Mark fields required
+- Set default values
+- Add help text
+- Add placeholder text
+- Set field visibility
+- Set role visibility
+- Add validation
+- Set minimum and maximum values
+- Configure allowed file types
+- Configure required photo count
+- Configure conditional logic
+- Preview the form on phone, tablet, and desktop
+
+==================================================
+3. CONDITIONAL FORM LOGIC
+==================================================
+
+Allow form sections and fields to appear based on earlier answers.
+
+Examples:
+
+IF:
+“Injury or incident?” equals Yes
+
+THEN SHOW:
+- Injured person
+- Incident description
+- Medical treatment
+- Supervisor notified
+- Incident photos
+- Required signature
+- Incident report attachment
+
+IF:
+“Backyard machine used?” equals Yes
+
+THEN SHOW:
+- Equipment unit
+- Operating hours
+- Mobilization
+- Access conditions
+- Damage check
+- Before and after photos
+
+IF:
+“Pole replaced?” equals Yes
+
+THEN SHOW:
+- Existing pole number
+- New pole size
+- New pole class
+- GPS location
+- Pole framing
+- Removal method
+- Disposal information
+- Pole photos
+- Associated billing items
+
+Support:
+
+- Equals
+- Does not equal
+- Greater than
+- Less than
+- Contains
+- Is blank
+- Is not blank
+- Any selected
+- All selected
+
+Allow multiple AND/OR conditions.
+
+Provide a test mode showing which fields and sections are triggered.
+
+==================================================
+4. CALCULATED FORM FIELDS
+==================================================
+
+Allow administrators to configure calculations.
+
+Examples:
+
+- Total labor hours
+- Total equipment hours
+- Quantity multiplied by rate
+- Total material quantity
+- Total charge
+- Production percentage
+- Difference between expected and actual quantity
+- Mileage calculation
+- Time duration
+- Crew-hour calculation
+
+Requirements:
+
+- Use a safe calculation engine.
+- Do not execute arbitrary user code.
+- Validate formulas before activation.
+- Prevent circular references.
+- Display calculation errors clearly.
+- Preserve the formula version used on submitted forms.
+
+==================================================
+5. FORM VERSIONING
+==================================================
+
+Every active form must have immutable version history.
+
+When an administrator changes an active form:
+
+- Create a new draft version.
+- Preserve the old version.
+- Do not alter previously submitted forms.
+- Require activation of the new version.
+- Record the effective date.
+- Show which version was used on each report.
+
+Submitted and approved forms must preserve:
+
+- Field definitions
+- Labels
+- Values
+- Calculations
+- Required-field rules
+- Signatures
+- Attachments
+- Form version
+
+==================================================
+6. CONNECT FORMS TO WORK PACKAGES
+==================================================
+
+Allow forms to be assigned to:
+
+- Company
+- Customer
+- Contract
+- Project
+- Work package
+- Billing item
+- Equipment type
+- Incident type
+- Storm event
+
+Examples:
+
+Selecting “45-foot Class 3 pole replacement” may require:
+
+- Daily report
+- Pole replacement checklist
+- Before photo
+- After photo
+- GPS location
+- Foreman signature
+- Supervisor approval
+
+Selecting “Digger Derrick” may require:
+
+- Daily equipment inspection
+- Equipment hours
+- Operator
+- Damage confirmation
+
+Selecting storm work may require:
+
+- Storm event ID
+- Customer work order
+- Storm production form
+- Additional photos
+- Storm billing validation
+
+==================================================
+7. REPORT COMPLETENESS ENGINE
+==================================================
+
+Create a documentation-completeness engine.
+
+Before submission, verify:
+
+- Required forms completed
+- Required fields completed
+- Required signatures collected
+- Required photos uploaded
+- Required GPS information recorded
+- Required billing codes present
+- Required equipment inspections completed
+- Required safety forms completed
+- Customer-specific requirements satisfied
+- All calculation fields valid
+- No unresolved high-priority warnings
+
+Classify issues:
+
+- Informational
+- Warning
+- High priority
+- Submission blocker
+
+Display one consolidated checklist showing:
+
+- Completed requirements
+- Missing requirements
+- Responsible user
+- Correction action
+- Approval requirement
+
+==================================================
+8. PHOTO EVIDENCE SYSTEM
+==================================================
+
+Build a complete field-photo system.
+
+Each photo should support:
+
+- Company
+- Project
+- Report
+- Work package
+- Billing item
+- Equipment
+- Structure or pole identifier
+- Category
+- Caption
+- Original filename
+- Upload timestamp
+- Capture timestamp when available
+- GPS location when available and permitted
+- Uploaded by
+- File size
+- File type
+- Processing status
+- Thumbnail
+- Full-resolution reference
+- Evidence status
+
+Photo categories:
+
+- Before work
+- During work
+- After work
+- Pole identification
+- Equipment
+- Material
+- Damage
+- Safety
+- Incident
+- Customer requirement
+- Quality control
+- Other
+
+Allow:
+
+- Camera capture
+- Library upload
+- Multiple-photo upload
+- Captioning
+- Reordering
+- Annotation markers
+- Linking photos to specific work items
+- Retrying failed uploads
+- Removing unsubmitted photos
+- Preserving approved evidence
+
+Do not permit ordinary users to delete evidence from approved reports.
+
+==================================================
+9. PHOTO QUALITY VALIDATION
+==================================================
+
+Add lightweight photo-quality checks.
+
+Detect and warn about:
+
+- File failed to upload
+- Unsupported format
+- File too large
+- Very low resolution
+- Completely blank or corrupted image
+- Duplicate photo
+- Missing required category
+- Missing caption when required
+
+Do not claim to verify construction quality automatically.
+
+Allow future AI photo analysis architecture, but clearly label it as inactive unless actually implemented and tested.
+
+==================================================
+10. GPS AND LOCATION RECORDS
+==================================================
+
+Allow forms and reports to record location when the user grants permission.
+
+Support:
+
+- Latitude
+- Longitude
+- Accuracy
+- Capture timestamp
+- Manual address
+- Structure number
+- Pole number
+- Circuit
+- Feeder
+- Substation
+- Work-order location
+
+Requirements:
+
+- GPS must be optional unless the company or contract requires it.
+- Explain why location is requested.
+- Record permission status.
+- Allow manual correction with an audit record.
+- Never continuously track workers.
+- Do not collect background location.
+- Do not create employee-surveillance features.
+
+Show location on a report only when authorized.
+
+==================================================
+11. DIGITAL SIGNATURES
+==================================================
+
+Create a secure signature system supporting:
+
+- Foreman signature
+- Crew member acknowledgment
+- Supervisor signature
+- Safety representative signature
+- Customer representative signature
+- Billing approval
+- Equipment operator signature
+- Custom signature role
+
+Each signature should record:
+
+- Printed name
+- Role
+- Signature image or drawn signature
+- User account when applicable
+- Date and time
+- Report or form version
+- Signature statement
+- IP or session metadata where appropriate
+- GPS only when permitted and required
+- Revocation or replacement history
+
+A signed form must not be silently altered.
+
+If signed information changes:
+
+- Mark the signature invalidated.
+- Explain what changed.
+- Require re-signing when configured.
+- Preserve the prior signature in audit history.
+
+==================================================
+12. CUSTOMER REPRESENTATIVE SIGNOFF
+==================================================
+
+Create a simple customer signoff flow.
+
+The customer representative should be able to review only the information intended for them.
+
+Support:
+
+- Name
+- Company
+- Title
+- Email or phone when provided
+- Signature
+- Date and time
+- Approval
+- Approval with notes
+- Rejection
+- Rejection reason
+
+Do not require the customer representative to receive access to internal pricing, wages, costs, margins, or private company notes.
+
+Allow a secure limited-use signoff link when safely supported.
+
+Requirements:
+
+- Expiring link
+- Single report or ticket scope
+- Revocation
+- No access to other projects
+- Audit record
+- Confirmation after signing
+
+==================================================
+13. FORM RESPONSE DATA MODEL
+==================================================
+
+Create a structured form-response model.
+
+Store:
+
+- Form template
+- Form version
+- Company
+- Project
+- Report
+- User
+- Status
+- Field values
+- Calculated values
+- Attachments
+- Signatures
+- Completion percentage
+- Validation results
+- Submission timestamp
+- Approval timestamp
+- Locked timestamp
+
+Do not store the entire system only as unvalidated free-form JSON when relational references or indexed values are required.
+
+Use a flexible but queryable architecture.
+
+==================================================
+14. OFFLINE-FIRST FIELD DRAFTS
+==================================================
+
+Improve field operation during weak or unavailable service.
+
+Support:
+
+- Creating reports offline
+- Editing report drafts offline
+- Completing custom forms offline
+- Adding labor and equipment offline
+- Recording production quantities offline
+- Capturing photo placeholders offline
+- Queueing uploads
+- Visible sync state
+- Retry failed syncs
+- Preventing duplicate submissions
+
+Statuses:
+
+- Saved locally
+- Waiting to sync
+- Syncing
+- Synced
+- Conflict detected
+- Upload failed
+- Requires attention
+
+Do not mark information as synced until the server confirms it.
+
+==================================================
+15. OFFLINE SECURITY
+==================================================
+
+Protect offline data.
+
+Requirements:
+
+- Store the minimum data required.
+- Do not store full company charge sheets unencrypted in ordinary browser local storage.
+- Do not store passwords or authentication tokens insecurely.
+- Remove local data after successful sync when appropriate.
+- Allow company administrators to revoke a device session.
+- Clear sensitive offline data after logout.
+- Document platform limitations honestly.
+
+If secure full offline support cannot be completed in the current architecture, implement a limited safe version and document exactly what remains unsupported.
+
+==================================================
+16. SYNC CONFLICT MANAGEMENT
+==================================================
+
+Create conflict handling for cases such as:
+
+- Two users edit the same report.
+- A foreman edits a report after a supervisor returns it.
+- An offline draft syncs after the server record changed.
+- A work-package template changed while offline.
+- Rates changed while a report was offline.
+
+Display:
+
+- Local value
+- Server value
+- Last editor
+- Last updated time
+- Recommended resolution
+
+Allow authorized users to:
+
+- Keep local
+- Keep server
+- Merge fields
+- Create a copy
+- Cancel and review
+
+Never silently overwrite approved or newer server data.
+
+==================================================
+17. CUSTOMER PORTAL
+==================================================
+
+Create a limited customer portal.
+
+Customer users may be permitted to view:
+
+- Their projects
+- Approved daily reports
+- Approved production
+- T&M tickets
+- Required photos
+- Submitted invoice packages
+- Change-order status
+- Documentation status
+
+Customer users must never see unless explicitly authorized:
+
+- Internal labor costs
+- Employee wages
+- Equipment internal costs
+- Gross margin
+- Other customers
+- Internal company notes
+- Potential revenue-leakage analytics
+- Private billing discussions
+
+Allow company administrators to configure portal access by customer and project.
+
+==================================================
+18. CUSTOMER DOCUMENT REQUESTS
+==================================================
+
+Allow authorized customer or internal users to request missing documentation.
+
+A request should include:
+
+- Project
+- Report
+- Requested document
+- Description
+- Due date
+- Requested by
+- Assigned user
+- Priority
+- Status
+- Response
+- Uploaded document
+- Completion timestamp
+
+Statuses:
+
+- Open
+- In progress
+- Submitted
+- Accepted
+- Rejected
+- Closed
+
+Notify the assigned internal user inside the application.
+
+==================================================
+19. CUSTOM REPORT PACKAGE BUILDER
+==================================================
+
+Allow administrators to configure customer submission packages.
+
+A package template may include:
+
+- Cover page
+- Daily reports
+- Production summary
+- Labor summary
+- Equipment summary
+- Billing summary
+- T&M tickets
+- Change orders
+- Photos
+- Safety forms
+- Equipment inspections
+- Customer signatures
+- Supporting documents
+- Custom forms
+
+Allow ordering and grouping.
+
+Examples:
+
+- Weekly PSO Production Package
+- Storm Restoration Backup Package
+- Municipal T&M Package
+- Pole Replacement Closeout Package
+
+Never include internal cost or margin information in customer packages unless explicitly configured by an authorized administrator.
+
+==================================================
+20. PDF FORM RECREATION AND OVERLAY ARCHITECTURE
+==================================================
+
+Prepare the system to support companies that must use existing PDF forms.
+
+Allow an administrator to:
+
+- Upload a blank PDF form
+- Name the template
+- Assign it to a customer or contract
+- Map Redline fields to PDF positions
+- Preview populated output
+- Save a versioned mapping
+- Generate completed PDFs
+
+Support mapped data such as:
+
+- Project
+- Date
+- Foreman
+- Crew
+- Labor hours
+- Equipment
+- Work performed
+- Billing items
+- Production quantities
+- Signatures
+- Notes
+
+Do not rely on OCR for blank form mapping when manual mapping is more reliable.
+
+Preserve the original uploaded form and mapping version.
+
+==================================================
+21. COMPANY ONBOARDING WIZARD
+==================================================
+
+Create a comprehensive onboarding wizard for new contractor companies.
+
+Steps:
+
+1. Company information
+2. User roles and permissions
+3. Customers
+4. Contracts
+5. Projects
+6. Labor classifications
+7. Equipment
+8. Charge sheets
+9. Work-package templates
+10. Custom forms
+11. Approval workflow
+12. Report requirements
+13. Export format
+14. Invite pilot users
+15. Run test report
+16. Launch readiness review
+
+Allow:
+
+- Save and continue later
+- Skip optional steps
+- Import from CSV or XLSX
+- Use fictional demo data
+- Clear progress indicator
+- Readiness checklist
+
+==================================================
+22. CREW AND USER INVITATIONS
+==================================================
+
+Create secure company invitations.
+
+Support roles:
+
+- Foreman
+- Supervisor
+- Billing reviewer
+- Project manager
+- Administrator
+- Executive
+- Customer user
+- Custom role
+
+Each invitation should include:
+
+- Company
+- Email or phone identifier when supported
+- Assigned role
+- Assigned projects
+- Assigned crews
+- Expiration date
+- Invitation status
+- Invited by
+- Accepted timestamp
+
+Requirements:
+
+- Expiring token
+- Single-use token
+- Revocation
+- Resend
+- Role review before acceptance
+- No access before acceptance
+- Server-side authorization
+
+==================================================
+23. PILOT COMPANY MODE
+==================================================
+
+Create a controlled pilot mode for early company testing.
+
+Pilot settings should include:
+
+- Pilot start date
+- Pilot end date
+- Pilot crews
+- Pilot projects
+- Pilot users
+- Enabled modules
+- Support contact
+- Feedback frequency
+- Data-export schedule
+- Pilot success metrics
+- Pilot status
+
+Statuses:
+
+- Setup
+- Training
+- Active
+- Paused
+- Completed
+- Cancelled
+
+Pilot mode must not weaken company-data isolation or security.
+
+==================================================
+24. PILOT SUCCESS METRICS
+==================================================
+
+Create measurable pilot reporting.
+
+Track:
+
+- Average time to complete a daily report
+- Reports completed on time
+- Reports completed after hours
+- Number of copied or templated reports
+- Average manual fields entered
+- Missing-charge warnings
+- Confirmed billing corrections
+- Potential undercharges identified
+- Equipment charges added after warning
+- Reports returned for correction
+- Approval time
+- Documentation completeness
+- Form completion rate
+- User-reported time saved
+
+Do not claim time or money was saved unless supported by measured or confirmed data.
+
+Keep separate metrics for:
+
+- Potential billing difference
+- Confirmed correction
+- Approved added billing
+- Dismissed warning
+- Estimated time saved
+- User-confirmed time saved
+
+==================================================
+25. IN-APP FEEDBACK SYSTEM
+==================================================
+
+Create a pilot feedback tool.
+
+Users should be able to report:
+
+- Bug
+- Confusing workflow
+- Missing equipment
+- Missing billing code
+- Missing work package
+- Incorrect calculation
+- Mobile-layout issue
+- Feature request
+- Other issue
+
+Each feedback record should support:
+
+- Company
+- User
+- Role
+- Page
+- Report ID when applicable
+- Description
+- Screenshot
+- Severity
+- Status
+- Assigned owner
+- Resolution notes
+- Created timestamp
+- Resolved timestamp
+
+Do not expose one company’s feedback to another company.
+
+==================================================
+26. SUPPORT AND HELP CENTER
+==================================================
+
+Create an in-app help center containing:
+
+- Starting a report
+- Copying yesterday
+- Using work packages
+- Entering labor
+- Adding equipment
+- Resolving billing warnings
+- Adding photos
+- Completing required forms
+- Signing reports
+- Submitting reports
+- Correcting returned reports
+- Working offline
+- Contacting support
+
+Allow company-specific help content.
+
+Keep instructions short and field-friendly.
+
+==================================================
+27. TRAINING MODE
+==================================================
+
+Create a safe training environment.
+
+Training mode should:
+
+- Use fictional data
+- Prevent records from entering production totals
+- Prevent records from entering invoicing
+- Clearly display “Training Mode”
+- Allow users to practice reports
+- Allow supervisors to review training submissions
+- Reset training data safely
+
+Do not mix training reports with real company reports.
+
+==================================================
+28. DEVICE AND SESSION MANAGEMENT
+==================================================
+
+Create user session management.
+
+Allow users to view:
+
+- Active devices
+- Approximate sign-in time
+- Last activity
+- Browser or device type
+- Current session
+
+Allow:
+
+- Sign out individual session
+- Sign out all other sessions
+- Revoke lost device
+- Require reauthentication for sensitive actions
+
+Company administrators may revoke sessions belonging to their company users but must not view unnecessary personal device details.
+
+==================================================
+29. SECURITY HARDENING
+==================================================
+
+Perform a complete security review.
+
+Verify:
+
+- Server-side authorization on every protected route
+- Company isolation
+- Project assignment enforcement
+- Customer portal isolation
+- Signed-link expiration
+- File access authorization
+- Form-version immutability
+- Approved-report locking
+- Rate visibility permissions
+- Internal-cost visibility permissions
+- Upload validation
+- File-size restrictions
+- File-type restrictions
+- Malware-scanning architecture when available
+- Rate limiting
+- CSRF protection when applicable
+- Secure cookies
+- Session expiration
+- Password reset safety
+- Audit logging
+- Secrets stored outside source control
+
+Do not expose private files through predictable public URLs.
+
+==================================================
+30. DATA RETENTION AND EXPORT
+==================================================
+
+Allow authorized company administrators to:
+
+- Export reports
+- Export form responses
+- Export production
+- Export billing data
+- Export photos index
+- Export audit history
+- Export users and permissions
+- Export configuration data
+
+Support:
+
+- CSV
+- XLSX when supported
+- PDF packages
+- JSON configuration export when safe
+
+Create configurable retention architecture for:
+
+- Draft reports
+- Submitted reports
+- Approved reports
+- Photos
+- Attachments
+- Audit logs
+- Customer signoff links
+- Training data
+
+Do not automatically delete approved or financially relevant records without explicit company configuration and confirmation.
+
+==================================================
+31. CONFIGURATION BACKUP AND RESTORE
+==================================================
+
+Allow company administrators to export configuration backups containing:
+
+- Labor classifications
+- Equipment catalog
+- Charge sheets
+- Billing rules
+- Work-package templates
+- Form templates
+- Approval workflows
+- Customer requirements
+- Export mappings
+
+Provide a preview and validation process before restoration.
+
+Never overwrite active configuration silently.
+
+==================================================
+32. PERFORMANCE AND FILE STORAGE
+==================================================
+
+Optimize:
+
+- Photo thumbnails
+- Image loading
+- Large report packages
+- Form rendering
+- Offline queue
+- Database queries
+- Customer portal loading
+- Dashboard filters
+- PDF generation
+- Spreadsheet exports
+
+Use pagination and background processing where appropriate.
+
+Do not load full-resolution images unnecessarily.
+
+Display progress for long-running exports.
+
+==================================================
+33. MOBILE EXPERIENCE
+==================================================
+
+Audit all field-facing pages.
+
+Requirements:
+
+- No horizontal scrolling
+- Large tap targets
+- One-handed use
+- High contrast
+- Fast form navigation
+- Sticky save actions
+- Collapsible sections
+- Numeric keyboards
+- Searchable selectors
+- Photo capture from camera
+- Clear offline status
+- Safe-area support
+- Keyboard-safe forms
+- Forms usable with outdoor glare
+- Clear submission blockers
+
+Test at:
+
+- 320px
+- 375px
+- 390px
+- 430px
+- Tablet
+- Desktop
+
+==================================================
+34. ACCESSIBILITY
+==================================================
+
+Improve accessibility.
+
+Requirements:
+
+- Proper labels
+- Keyboard navigation
+- Screen-reader support
+- Focus management
+- Error announcements
+- Sufficient contrast
+- Text resizing
+- Accessible modal dialogs
+- Accessible signature alternatives where appropriate
+- Do not use color alone to communicate warning severity
+
+==================================================
+35. DEMO DATA
+==================================================
+
+Create fictional pilot data for:
+
+Company:
+- Prairie Line Contractors
+
+Customer:
+- Red River Electric Utility
+
+Pilot:
+- Two crews
+- Two foremen
+- One supervisor
+- One billing reviewer
+- One project manager
+- One customer user
+
+Include:
+
+- Daily report form
+- Tailboard form
+- Equipment inspection form
+- Pole replacement checklist
+- Customer signoff form
+- Photo requirements
+- GPS requirement
+- Work-package assignment
+- Customer report package
+- Training report
+- Offline draft example
+- Documentation request
+
+Clearly label all data as fictional.
+
+==================================================
+36. AUTOMATED TESTING
+==================================================
+
+Add tests for:
+
+- Form creation
+- Form versioning
+- Conditional fields
+- Required fields
+- Calculated fields
+- Circular calculation prevention
+- Form-work-package assignment
+- Documentation completeness
+- Photo upload authorization
+- Duplicate photos
+- GPS permission handling
+- Signature locking
+- Signature invalidation after edits
+- Customer signoff links
+- Link expiration
+- Customer portal permissions
+- Offline draft queue
+- Sync retries
+- Conflict resolution
+- Company invitations
+- Invitation expiration
+- Training-mode isolation
+- Pilot metrics
+- Configuration backup
+- Configuration restoration
+- Report package generation
+- File access authorization
+- Cross-company isolation
+- Mobile rendering
+
+Edge cases:
+
+- Form changes after report started
+- Form expires during an offline shift
+- User signs before all required fields are complete
+- Photo upload fails repeatedly
+- GPS unavailable
+- Customer signoff link forwarded
+- User removed while offline
+- Charge sheet changes while report is offline
+- Duplicate report sync
+- Device session revoked
+- Customer requests documentation after report approval
+- Form calculation returns invalid result
+- Training report accidentally submitted
+- Archived form referenced by historical report
+
+==================================================
+37. REGRESSION TESTING
+==================================================
+
+Retest:
+
+- Registration
+- Authentication
+- Company creation
+- Crews
+- Projects
+- Daily reports
+- Labor
+- Equipment
+- Materials
+- Charge sheets
+- Billing rules
+- Work packages
+- Missing-charge detection
+- Undercharge detection
+- Production
+- Job costing
+- Approvals
+- Amendments
+- T&M tickets
+- Invoice preparation
+- Change orders
+- Customer requirements
+- PDF generation
+- Mobile layouts
+- Audit logs
+- Permissions
+
+Fix all discovered regressions before completion.
+
+==================================================
+COMPLETION REQUIREMENTS
+==================================================
+
+Do not stop after creating mock interfaces.
+
+Deliver working:
+
+- Form-template builder
+- Conditional fields
+- Calculated fields
+- Form versioning
+- Work-package form assignments
+- Completeness validation
+- Photo evidence
+- GPS records
+- Digital signatures
+- Customer signoff
+- Offline drafts and sync queue
+- Conflict resolution
+- Customer portal
+- Documentation requests
+- Custom report packages
+- PDF form mapping architecture
+- Company onboarding wizard
+- User invitations
+- Pilot mode
+- Pilot metrics
+- Feedback system
+- Training mode
+- Session management
+- Security hardening
+- Data exports
+- Configuration backup
+- Mobile responsiveness
+- Automated tests
+
+At completion, provide:
+
+1. Features built
+2. Database migrations
+3. Form-builder functionality
+4. Offline capabilities
+5. Security controls
+6. Customer portal permissions
+7. Signature behavior
+8. Pilot metrics
+9. Tests completed
+10. Existing bugs fixed
+11. Features still mocked
+12. Known limitations
+13. Exact steps required to begin a real controlled pilot
+14. Recommended next phase
+
+Primary success condition:
+
+A contractor should be able to configure its existing field paperwork, billing requirements, work-package documentation, photo requirements, and approval process without custom code. A foreman should then be able to complete the required workflow from a phone, including during poor connectivity, and submit a complete review-ready package without re-entering the same information across multiple forms.
