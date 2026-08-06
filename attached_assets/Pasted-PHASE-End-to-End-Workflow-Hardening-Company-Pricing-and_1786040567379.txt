@@ -1,0 +1,1014 @@
+PHASE: End-to-End Workflow Hardening, Company Pricing and Template Configuration, Pole Photo Recognition, and Billing Recommendation Validation
+
+Objective:
+
+Make the entire Redline workflow stable, fast, mobile-friendly, and ready for controlled field testing.
+
+The application must allow each contractor company to:
+
+- Enter or import its own pricing
+- Build its own pole and work-package templates
+- Configure its own billing rules
+- Configure customer-specific and contract-specific rates
+- Take or upload photos of poles
+- Receive suggested pole attributes from image analysis
+- Match those suggested attributes to company templates
+- Suggest likely billable items
+- Require human confirmation before saving or billing
+- Complete reports with minimal repetitive entry
+- Preserve a full audit trail
+
+The primary workflow should be:
+
+1. Foreman opens today’s assignment.
+2. Existing crew, project, equipment, and customer data are prefilled.
+3. Foreman takes a photo of the pole.
+4. The system analyzes the photo.
+5. The system suggests likely pole characteristics.
+6. The system matches the result to the company’s configured template.
+7. The system loads expected work items, equipment, materials, forms, and billing codes.
+8. The foreman confirms or corrects the selections.
+9. The system validates for missing or inconsistent charges.
+10. The report is reviewed and submitted.
+
+Do not allow image recognition to create final billing without human review.
+
+Do not remove, rebuild, or break existing:
+
+- Authentication
+- Company onboarding
+- Company isolation
+- Users and roles
+- Crews
+- Projects
+- Work orders
+- Daily reports
+- Labor
+- Equipment
+- Materials
+- Charge sheets
+- Billing rules
+- Work-package templates
+- Custom forms
+- Photos
+- Signatures
+- Production tracking
+- Job costing
+- Approvals
+- Audit history
+- Mobile layouts
+- Existing database records
+
+Before implementation:
+
+1. Inspect the complete repository.
+2. Review all current models, routes, forms, calculations, imports, templates, and tests.
+3. Run all existing tests.
+4. Record all current failures.
+5. Fix broken primary workflows first.
+6. Reuse existing systems instead of creating duplicates.
+7. Create safe backward-compatible migrations.
+8. Preserve approved reports and historical pricing.
+9. Do not reset the database.
+10. Do not claim a feature works unless it is tested end to end.
+
+==================================================
+1. FULL WORKFLOW AUDIT
+==================================================
+
+Audit the entire user journey:
+
+- Registration
+- Login
+- Company creation
+- Joining a company
+- Role assignment
+- Customer creation
+- Contract creation
+- Project creation
+- Crew creation
+- Equipment creation
+- Charge-sheet setup
+- Template setup
+- Starting a report
+- Copying yesterday
+- Selecting a work package
+- Taking a pole photo
+- Reviewing recognition results
+- Entering labor
+- Entering equipment
+- Entering materials
+- Running billing validation
+- Saving a draft
+- Reopening a draft
+- Submitting
+- Supervisor review
+- Billing review
+- Approval
+- PDF/export generation
+
+Fix:
+
+- Dead buttons
+- Silent failures
+- Broken navigation
+- Duplicate submissions
+- Data not persisting
+- Incorrect calculations
+- Missing loading states
+- Missing error messages
+- Mobile overflow
+- Keyboard-covered controls
+- Authorization errors
+- Cross-company data exposure
+- Stale template data
+- Incorrect rate selection
+
+Create a documented workflow test matrix.
+
+==================================================
+2. MOBILE FLOW HARDENING
+==================================================
+
+Optimize every field-facing screen.
+
+Requirements:
+
+- No horizontal scrolling
+- No clipped buttons
+- No hidden form controls
+- No modal wider than the viewport
+- Large tap targets
+- Numeric keyboards for quantities and hours
+- Searchable selectors
+- Sticky save and continue actions
+- Clear back navigation
+- Keyboard-safe inputs
+- Safe-area support
+- Outdoor-friendly contrast
+- Fast loading
+- Clear offline and sync states
+- One-handed use where practical
+
+Test at:
+
+- 320px
+- 375px
+- 390px
+- 430px
+- Tablet
+- Desktop
+
+==================================================
+3. COMPANY PRICING CENTER
+==================================================
+
+Create or improve a company-admin area called:
+
+“Pricing, Charge Sheets, and Billing Rules”
+
+Each company must be able to configure:
+
+- Customers
+- Contracts
+- Charge sheets
+- Billing codes
+- Unit prices
+- Labor rates
+- Equipment rates
+- Material rates
+- Storm rates
+- Emergency rates
+- Overtime rates
+- Double-time rates
+- Mobilization
+- Demobilization
+- Standby
+- Minimum charges
+- Customer-specific overrides
+- Project-specific overrides
+- Effective dates
+- Expiration dates
+- Approval status
+
+Support:
+
+- Manual entry
+- CSV import
+- XLSX import
+- Column mapping
+- Preview
+- Validation
+- Duplicate detection
+- Versioning
+- Activation
+- Archiving
+- Rollback to a prior configuration version where safe
+
+Never overwrite an active historical rate sheet used on approved reports.
+
+==================================================
+4. COMPANY TEMPLATE CENTER
+==================================================
+
+Create or improve a company-admin area called:
+
+“Templates and Work Packages”
+
+Allow companies to create templates for:
+
+- Pole types
+- Pole replacements
+- Pole removals
+- Transformer installations
+- Transformer replacements
+- Framing packages
+- Guying
+- Anchors
+- Services
+- Conductor work
+- Storm restoration
+- Equipment setups
+- Crew setups
+- Material kits
+- Custom work types
+
+Each template should support:
+
+- Template name
+- Customer
+- Contract
+- Work type
+- Pole attributes
+- Default labor
+- Default equipment
+- Default materials
+- Default billing codes
+- Required billing codes
+- Optional add-ons
+- Minimum quantities
+- Required photos
+- Required forms
+- Required signatures
+- Default notes
+- Validation rules
+- Effective dates
+- Version
+- Active status
+
+Allow:
+
+- Copy template
+- Duplicate for another customer
+- Edit draft version
+- Activate new version
+- Archive old version
+- Preview what the foreman will see
+
+==================================================
+5. POLE ATTRIBUTE CATALOG
+==================================================
+
+Create a structured pole catalog.
+
+Support attributes such as:
+
+- Material
+- Wood
+- Steel
+- Concrete
+- Composite
+- Height
+- Class
+- Species when known
+- Manufacturer when known
+- Age or approximate age
+- Pole number
+- Ownership marking
+- Utility marking
+- Treatment markings
+- Framing type
+- Crossarm count
+- Transformer presence
+- Transformer configuration
+- Guying
+- Anchor presence
+- Equipment mounted
+- Conductor configuration
+- Number of phases
+- Neutral configuration
+- Service attachments
+- Communication attachments
+- Existing damage
+- Leaning condition
+- Burn damage
+- Rot indicators
+- Access type
+- Backyard access
+- Roadside access
+- Terrain
+- Structure type
+- Custom company attributes
+
+Do not assume all attributes can be reliably determined from a photo.
+
+==================================================
+6. POLE PHOTO CAPTURE WORKFLOW
+==================================================
+
+Create a mobile-first action:
+
+“Identify Pole From Photo”
+
+Allow:
+
+- Camera capture
+- Photo library upload
+- Multiple-angle capture
+- Pole tag close-up
+- Full-pole image
+- Base image
+- Top framing image
+- Transformer close-up
+- Damage image
+
+Guide the user to take useful photos.
+
+Example prompts:
+
+- Take one full view of the pole.
+- Take a close-up of any pole tag or stamp.
+- Take a clear view of the top framing.
+- Take a clear view of attached equipment.
+- Take a base photo if condition matters.
+
+Display upload and processing progress.
+
+Allow retry.
+
+Do not block manual entry if the camera or recognition service fails.
+
+==================================================
+7. IMAGE ANALYSIS ARCHITECTURE
+==================================================
+
+Build a modular image-analysis service layer.
+
+The system should support future or configured vision providers without tightly coupling the application to one provider.
+
+Architecture should include:
+
+- Provider interface
+- Image preprocessing
+- Secure file reference
+- Prompt or classification configuration
+- Structured response schema
+- Confidence scores
+- Provider result storage
+- Error handling
+- Retry
+- Timeout
+- Usage tracking
+- Cost tracking
+- Version tracking
+- Human-confirmation status
+
+Use environment variables or Replit Secrets for credentials.
+
+Do not hard-code API keys.
+
+If no actual vision provider is configured:
+
+- Implement a clearly labeled mock or development mode.
+- Do not present mock results as real recognition.
+- Document exactly what must be configured.
+
+==================================================
+8. STRUCTURED POLE RECOGNITION OUTPUT
+==================================================
+
+The recognition service should return structured suggestions, not unstructured prose only.
+
+Suggested output fields:
+
+- Likely pole material
+- Likely height range
+- Likely class when visible
+- Pole tag text when readable
+- Pole number when readable
+- Utility or ownership marking when readable
+- Crossarm count
+- Transformer present
+- Transformer count
+- Transformer configuration
+- Phase configuration
+- Guy wire present
+- Anchor visible
+- Equipment attached
+- Visible damage
+- Access type
+- Possible work-package matches
+- Possible template matches
+- Required additional photos
+- Confidence for each field
+- Overall confidence
+- Recognition limitations
+
+Each field should support:
+
+- Suggested value
+- Confidence
+- Evidence source
+- User-confirmed value
+- User-corrected value
+- Confirmation timestamp
+- Confirming user
+
+==================================================
+9. CONFIDENCE AND UNCERTAINTY
+==================================================
+
+Do not show one overall “identified” result without detail.
+
+Confidence levels:
+
+- High confidence
+- Medium confidence
+- Low confidence
+- Unable to determine
+
+Require manual confirmation for:
+
+- Pole height
+- Pole class
+- Billing code
+- Unit quantity
+- Contract rate
+- Work performed
+- Equipment used
+- Material used
+- Damage assessment
+
+Display clear messages such as:
+
+“Likely 45-foot wood distribution pole. Height and class require confirmation.”
+
+“Pole tag was not readable. Take a closer photo or enter manually.”
+
+Never use language such as:
+
+- Exact identification guaranteed
+- Billing guaranteed
+- Fully verified from image
+- Automatic final charge
+
+==================================================
+10. OCR FOR POLE TAGS AND MARKINGS
+==================================================
+
+Add targeted text extraction for:
+
+- Pole tags
+- Pole numbers
+- Utility markings
+- Manufacturer labels
+- Transformer labels
+- Equipment unit labels
+
+Requirements:
+
+- Preserve original image
+- Store extracted text separately
+- Show confidence
+- Allow manual correction
+- Do not overwrite confirmed values
+- Record OCR version
+- Record user confirmation
+
+Use OCR only on relevant cropped regions when possible.
+
+==================================================
+11. TEMPLATE MATCHING ENGINE
+==================================================
+
+Match confirmed and suggested attributes against company-configured templates.
+
+Example:
+
+Suggested attributes:
+
+- Wood
+- Approximate 45-foot height
+- Distribution
+- One crossarm
+- Single-phase transformer
+- Backyard access
+
+Possible template match:
+
+“45-foot Class 3 Backyard Pole Replacement”
+
+Show:
+
+- Best match
+- Alternate matches
+- Matching fields
+- Conflicting fields
+- Missing fields
+- Template confidence
+- Required user confirmations
+
+Do not auto-select a template when confidence is below the company-configured threshold.
+
+==================================================
+12. TEMPLATE SELECTION REVIEW
+==================================================
+
+After photo analysis, display:
+
+“Review Suggested Pole Setup”
+
+Sections:
+
+- Pole attributes
+- Work type
+- Template
+- Labor
+- Equipment
+- Materials
+- Billing codes
+- Required documentation
+
+Allow the foreman to:
+
+- Accept all confirmed suggestions
+- Correct individual fields
+- Choose a different template
+- Start manually
+- Request another photo
+- Save as draft
+
+==================================================
+13. BILLING RECOMMENDATION ENGINE
+==================================================
+
+Once a template is selected and confirmed, load:
+
+- Expected billing codes
+- Required billing codes
+- Standard quantities
+- Labor classifications
+- Equipment
+- Material items
+- Mobilization
+- Demobilization
+- Standby
+- Storm rates
+- Emergency rates
+- Customer requirements
+
+Display:
+
+- Suggested items
+- Required items
+- Optional add-ons
+- Items needing confirmation
+- Pricing source
+- Applicable contract
+- Rate effective date
+
+Do not convert suggested items into final billing until reviewed.
+
+==================================================
+14. MISSING-CHARGE AND UNDERCHARGE VALIDATION
+==================================================
+
+Validate for:
+
+- Pole work selected without pole billing code
+- Pole removal missing
+- Disposal or haul-off missing
+- Digger derrick used without equipment charge
+- Bucket truck used without equipment charge
+- Backyard machine used without specialty equipment charge
+- Mobilization missing
+- Minimum equipment hours not met
+- Labor classification missing
+- Overtime billed at regular rate
+- Double-time billed incorrectly
+- Storm rate missing
+- Customer-specific rate not applied
+- Expired rate used
+- Wrong charge sheet selected
+- Quantity below minimum
+- Required photo missing
+- Required form missing
+- Pole tag required but missing
+- Template selection conflicts with confirmed pole attributes
+
+Show:
+
+- Current estimated total
+- Expected configured total
+- Potential difference
+- Items causing the difference
+- Required review action
+
+Label all differences:
+
+“Potential billing difference — requires human review.”
+
+==================================================
+15. COMPANY-CONFIGURABLE RECOGNITION RULES
+==================================================
+
+Allow administrators to define recognition-assisted rules.
+
+Examples:
+
+IF:
+- Pole material = Wood
+- Height range = 45 feet
+- Transformer present = Yes
+- Access type = Backyard
+
+THEN SUGGEST:
+- Backyard pole replacement template
+- Backyard machine
+- Digger derrick
+- Bucket truck
+- Specific billing codes
+- Required photo categories
+
+Allow:
+
+- Confidence threshold
+- Required human confirmation
+- Rule priority
+- Customer scope
+- Contract scope
+- Effective dates
+- Active status
+
+Do not allow recognition rules to bypass billing approval.
+
+==================================================
+16. HUMAN REVIEW REQUIREMENTS
+==================================================
+
+Create configurable review rules.
+
+Examples:
+
+- Foreman must confirm pole attributes.
+- Supervisor must approve low-confidence matches.
+- Billing reviewer must approve pricing.
+- Customer signature required for T&M.
+- Administrator approval required for manual rate override.
+
+Track:
+
+- Suggested value
+- Confirmed value
+- Correcting user
+- Reason
+- Timestamp
+- Approval status
+
+==================================================
+17. RECOGNITION FEEDBACK LOOP
+==================================================
+
+Store user corrections for future model evaluation.
+
+Track:
+
+- Original image-analysis result
+- Confirmed result
+- Corrected fields
+- Confidence
+- Template selected
+- Billing items approved
+- User role
+- Model version
+- Date
+
+Do not automatically train on customer data without an explicit approved data-use policy.
+
+Provide architecture for:
+
+- Evaluation dataset
+- False-positive review
+- False-negative review
+- Accuracy reporting
+- Model comparison
+- Tenant opt-in controls
+
+==================================================
+18. RECOGNITION ACCURACY DASHBOARD
+==================================================
+
+Create an internal admin dashboard showing:
+
+- Photos analyzed
+- Successful analyses
+- Failed analyses
+- Average processing time
+- High-confidence fields
+- Low-confidence fields
+- Most-corrected attributes
+- Template match accuracy
+- Billing suggestion acceptance
+- Recognition failures by device or image quality
+- Model version performance
+
+Do not expose one company’s images or results to another company.
+
+==================================================
+19. FAILURE AND FALLBACK FLOW
+==================================================
+
+If analysis fails:
+
+- Show a clear message.
+- Preserve the photo.
+- Allow retry.
+- Allow manual entry.
+- Allow template selection.
+- Do not lose report progress.
+- Do not block the entire report.
+- Log the failure without sensitive content.
+
+If recognition is uncertain:
+
+- Ask for another photo.
+- Identify exactly which view is needed.
+- Preserve previous suggestions.
+- Allow manual confirmation.
+
+==================================================
+20. END-TO-END SPEED OPTIMIZATION
+==================================================
+
+Measure and optimize:
+
+- Time to open today’s work
+- Time to take a photo
+- Image upload time
+- Recognition time
+- Template-match time
+- Time to confirm a pole
+- Time to complete a report
+- Time to submit
+- Time to review
+- Time to generate PDF
+
+Use background processing where appropriate.
+
+Display progress for recognition and large uploads.
+
+Prevent duplicate recognition jobs.
+
+==================================================
+21. DATA SECURITY
+==================================================
+
+Verify:
+
+- Photos are company-isolated
+- Recognition results are company-isolated
+- Charge sheets are company-isolated
+- Templates are company-isolated
+- Pricing is hidden from unauthorized roles
+- Original photos are not public
+- File access requires authorization
+- Temporary URLs expire
+- Provider credentials remain secret
+- AI providers receive only required data
+- Logs exclude private pricing and image contents
+- Deleted drafts are handled consistently
+- Approved evidence cannot be deleted by ordinary users
+
+==================================================
+22. PHOTO RETENTION AND CONSENT
+==================================================
+
+Create company-configurable photo retention architecture.
+
+Support:
+
+- Draft-photo retention
+- Submitted-report retention
+- Approved-report retention
+- Customer evidence retention
+- Recognition-result retention
+- Model-evaluation opt-in
+- User-facing camera explanation
+- GPS metadata policy
+
+Do not automatically use customer photos for model training.
+
+==================================================
+23. TEST DATA
+==================================================
+
+Create fictional pole-recognition examples.
+
+Include simulated or clearly labeled test cases for:
+
+- 40-foot wood pole
+- 45-foot wood pole
+- 50-foot wood pole
+- Steel pole
+- Concrete pole
+- Pole with one transformer
+- Pole with three-transformer bank
+- Backyard pole
+- Roadside pole
+- Pole with unreadable tag
+- Pole with damage
+- Poor-light photo
+- Blurry photo
+- Multiple poles in one photo
+- No pole in photo
+
+Use fictional pricing and fictional companies only.
+
+==================================================
+24. AUTOMATED TESTING
+==================================================
+
+Add tests for:
+
+- Company pricing creation
+- Charge-sheet imports
+- Template creation
+- Template versioning
+- Recognition job creation
+- Recognition timeout
+- Recognition retry
+- Structured result validation
+- Confidence handling
+- OCR correction
+- Template matching
+- Alternate template suggestions
+- Low-confidence blocking
+- Human confirmation
+- Billing recommendation loading
+- Missing-charge detection
+- Undercharge detection
+- Rate precedence
+- Manual override audit
+- Photo authorization
+- Cross-company isolation
+- Failed upload recovery
+- Duplicate recognition-job prevention
+- Report completion after recognition failure
+- Mobile rendering
+- PDF output
+
+Edge cases:
+
+- No vision provider configured
+- Invalid provider response
+- Provider returns unstructured text
+- Photo too large
+- Unsupported file type
+- Multiple poles visible
+- Pole partially blocked
+- Pole tag unreadable
+- Template deleted after report started
+- Rate changes during report creation
+- User changes company
+- Offline photo capture
+- Recognition finishes after manual entry
+- Foreman rejects suggestion
+- Supervisor corrects template
+- Billing reviewer changes code
+- Approved report later amended
+
+==================================================
+25. MANUAL FIELD TEST SCRIPT
+==================================================
+
+Create a repeatable field-testing script.
+
+Test sequence:
+
+1. Sign in as foreman.
+2. Open today’s assignment.
+3. Confirm crew.
+4. Confirm equipment.
+5. Take a pole photo.
+6. Review suggested attributes.
+7. Correct one attribute.
+8. Select suggested template.
+9. Review labor.
+10. Review equipment.
+11. Review materials.
+12. Review billing codes.
+13. Add required photos.
+14. Complete required forms.
+15. Run validation.
+16. Save draft.
+17. Reopen draft.
+18. Submit.
+19. Review as supervisor.
+20. Review as billing user.
+21. Approve.
+22. Generate final report.
+23. Verify audit trail.
+24. Verify another company cannot access the record.
+
+Document expected results and actual results.
+
+==================================================
+26. REGRESSION TESTING
+==================================================
+
+Retest all existing systems:
+
+- Registration
+- Login
+- Company creation
+- Invitations
+- Roles
+- Customers
+- Contracts
+- Projects
+- Crews
+- Work orders
+- Reports
+- Labor
+- Equipment
+- Materials
+- Charge sheets
+- Billing rules
+- Templates
+- Custom forms
+- Photos
+- GPS
+- Signatures
+- Production
+- Job costing
+- Approvals
+- Offline drafts
+- Customer portal
+- Exports
+- Audit logs
+- Mobile layouts
+
+Fix all regressions before completion.
+
+==================================================
+COMPLETION REQUIREMENTS
+==================================================
+
+Do not stop after building screens or mock results.
+
+Deliver working:
+
+- Smooth end-to-end report flow
+- Mobile layout corrections
+- Company pricing management
+- Charge-sheet imports
+- Company template management
+- Pole attribute catalog
+- Pole photo capture
+- Modular vision-provider architecture
+- Structured recognition results
+- Confidence handling
+- OCR support for pole markings
+- Template matching
+- Billing recommendations
+- Missing-charge detection
+- Undercharge detection
+- Human review workflow
+- Recognition audit history
+- Failure fallback
+- Security controls
+- Automated tests
+- Manual field-test script
+
+At completion, provide:
+
+1. Existing workflow problems found
+2. Bugs fixed
+3. Mobile issues fixed
+4. Company pricing functionality
+5. Company template functionality
+6. Vision provider configured or still mocked
+7. Pole attributes currently supported
+8. Recognition confidence behavior
+9. Billing recommendation behavior
+10. Human review requirements
+11. Database migrations
+12. Security improvements
+13. Tests run and results
+14. Known limitations
+15. Exact steps for testing with real pole photos
+16. Recommended next phase
+
+Primary success condition:
+
+A company administrator can enter or import its own rates and build its own pole templates. A foreman can open a prefilled assignment, take one or more pole photos, receive transparent confidence-scored suggestions, select or correct the matching template, review the company-configured billing items, and submit a complete report without re-entering information that the system already knows.
