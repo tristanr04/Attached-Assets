@@ -6,6 +6,7 @@ import {
   crewMembersTable
 } from "@workspace/db";
 import { requireAuth, type AuthenticatedRequest } from "../middlewares/requireAuth";
+import { parsePositiveId } from "../lib/requestValues";
 
 const router: IRouter = Router();
 
@@ -88,15 +89,19 @@ router.delete("/report-templates/:id", requireAuth, async (req: AuthenticatedReq
 // ── Apply template to a report ────────────────────────────────────────────────
 router.post("/report-templates/:id/apply", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const templateId = parseInt(req.params.id, 10);
-  const reportId = parseInt(req.body.reportId, 10);
-  if (isNaN(templateId) || isNaN(reportId)) { res.status(400).json({ error: "templateId and reportId required" }); return; }
+  const templateId = parsePositiveId(req.params.id);
+  const reportId = parsePositiveId(req.body.reportId);
+  if (templateId === null || reportId === null) { res.status(400).json({ error: "templateId and reportId required" }); return; }
 
   const [template] = await db.select().from(reportTemplatesTable).where(eq(reportTemplatesTable.id, templateId));
   if (!template) { res.status(404).json({ error: "Template not found" }); return; }
 
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Report not found" }); return; }
+  if (report.companyId !== template.companyId) {
+    res.status(403).json({ error: "Template and report must belong to the same company" });
+    return;
+  }
 
   const m = await checkAccess(req.clerkUserId, template.companyId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
@@ -278,15 +283,19 @@ router.delete("/work-package-templates/:id", requireAuth, async (req: Authentica
 // ── Apply work package to report ──────────────────────────────────────────────
 router.post("/work-package-templates/:id/apply", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const wpId = parseInt(req.params.id, 10);
-  const reportId = parseInt(req.body.reportId, 10);
-  if (isNaN(wpId) || isNaN(reportId)) { res.status(400).json({ error: "id and reportId required" }); return; }
+  const wpId = parsePositiveId(req.params.id);
+  const reportId = parsePositiveId(req.body.reportId);
+  if (wpId === null || reportId === null) { res.status(400).json({ error: "id and reportId required" }); return; }
 
   const [wp] = await db.select().from(workPackageTemplatesTable).where(eq(workPackageTemplatesTable.id, wpId));
   if (!wp) { res.status(404).json({ error: "Not found" }); return; }
 
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Report not found" }); return; }
+  if (report.companyId !== wp.companyId) {
+    res.status(403).json({ error: "Work package and report must belong to the same company" });
+    return;
+  }
 
   const m = await checkAccess(req.clerkUserId, wp.companyId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }

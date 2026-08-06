@@ -10,6 +10,7 @@ import {
 test("parsePositiveId accepts only canonical positive integer strings", () => {
   assert.equal(parsePositiveId("1"), 1);
   assert.equal(parsePositiveId("482"), 482);
+  assert.equal(parsePositiveId(482), 482);
   assert.equal(parsePositiveId(String(Number.MAX_SAFE_INTEGER)), Number.MAX_SAFE_INTEGER);
 });
 
@@ -28,11 +29,26 @@ test("parsePositiveId rejects ambiguous, malformed, and unsafe values", () => {
     "12 ",
     ["12"],
     ["12", "13"],
+    0,
+    -1,
+    1.5,
     Number.MAX_SAFE_INTEGER + 1,
     String(Number.MAX_SAFE_INTEGER + 1),
   ]) {
     assert.equal(parsePositiveId(value), null, `expected ${JSON.stringify(value)} to be rejected`);
   }
+});
+
+test("templates and work packages cannot be applied across companies", async () => {
+  const source = await readFile(
+    new URL("../routes/report-templates.ts", import.meta.url),
+    "utf8",
+  );
+  const companyBoundaryGuards = source.match(
+    /report\.companyId !== (?:template|wp)\.companyId/g,
+  );
+
+  assert.equal(companyBoundaryGuards?.length, 2);
 });
 
 test("company selection never accepts a company outside the user's memberships", () => {
