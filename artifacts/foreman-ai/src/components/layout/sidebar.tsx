@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Link, useLocation } from "wouter";
 import { useClerk, useUser } from "@clerk/react";
-import { Home, FileText, Users, HardHat, Settings, LogOut, Building, ShieldAlert, DollarSign } from "lucide-react";
+import { Home, FileText, Users, HardHat, Settings, LogOut, Building, ShieldAlert, DollarSign, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useCompanyStore } from "@/hooks/use-company-store";
@@ -69,6 +69,12 @@ export function Sidebar() {
       title: "Rates & Billing",
       href: "/settings/rates",
       icon: DollarSign,
+      roles: ['supervisor', 'admin']
+    });
+    navItems.push({
+      title: "Pole Knowledge",
+      href: "/settings/pkb",
+      icon: Zap,
       roles: ['supervisor', 'admin']
     });
   }

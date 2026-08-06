@@ -25,11 +25,13 @@ import ReportCreatePage from "@/pages/reports/new";
 import ReportEditPage from "@/pages/reports/edit";
 import ReportDetailPage from "@/pages/reports/detail";
 import ReportPrintPage from "@/pages/reports/print";
+import BillingReviewPage from "@/pages/reports/billing-review";
 import CrewsListPage from "@/pages/crews/index";
 import CrewDetailPage from "@/pages/crews/detail";
 import ProjectsListPage from "@/pages/projects/index";
 import SettingsPage from "@/pages/settings";
 import RatesSettingsPage from "@/pages/settings/rates";
+import PoleKnowledgeCenterPage from "@/pages/settings/pkb/index";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useGetMe, useListCompanies, useUpsertMe, getListCompaniesQueryKey } from "@workspace/api-client-react";
@@ -239,6 +241,9 @@ function ClerkProviderWithRoutes() {
         <Route path="/reports/:id">
           {(params) => <ProtectedRoute component={() => <ReportDetailPage id={parseInt(params.id)} />} />}
         </Route>
+        <Route path="/reports/:id/billing">
+          {(params) => <ProtectedRoute component={() => <BillingReviewPage id={parseInt(params.id)} />} />}
+        </Route>
         <Route path="/reports/:id/print">
           {(params) => <ProtectedRoute hideLayout component={() => <ReportPrintPage id={parseInt(params.id)} />} />}
         </Route>
@@ -259,6 +264,12 @@ function ClerkProviderWithRoutes() {
         </Route>
         <Route path="/settings/rates">
           {() => <ProtectedRoute component={RatesSettingsPage} />}
+        </Route>
+        <Route path="/settings/pkb/:section">
+          {(params) => <ProtectedRoute component={() => <PoleKnowledgeCenterPage section={params.section} />} />}
+        </Route>
+        <Route path="/settings/pkb">
+          {() => <ProtectedRoute component={() => <PoleKnowledgeCenterPage section="pole-types" />} />}
         </Route>
       </Switch>
     </ClerkProvider>

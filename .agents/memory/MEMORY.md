@@ -2,3 +2,4 @@
 - [QueryClientProvider placement](query-client-provider.md) — design subagent omits QueryClientProvider; always verify App.tsx wraps ClerkProvider inside QueryClientProvider, not outside
 - [DB seed approach](db-seed.md) — seed via `node --input-type=module` from `lib/db/` directory so pg package resolves; do not use scripts/ at root since pg isn't in root package.json
 - [Foreman AI architecture](foreman-ai-arch.md) — full-stack daily report app: React+Vite frontend, Express 5 API, Postgres+Drizzle; demo company "Prairie Line Contractors" (ID=1) seeded with 2 crews, 2 projects, 3 reports
+- [PKB build state](pkb-build-state.md) — all PKB tasks #18–#28 substantially implemented; OpenAI Vision integrated; import-jobs schema quirks documented

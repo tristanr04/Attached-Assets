@@ -11,6 +11,7 @@ import dashboardRouter from "./dashboard";
 import laborClassificationsRouter from "./labor-classifications";
 import billableItemsRouter from "./billable-items";
 import reportTemplatesRouter from "./report-templates";
+import pkbRouter from "./pkb";
 
 const router: IRouter = Router();
 
@@ -26,5 +27,6 @@ router.use(dashboardRouter);
 router.use(laborClassificationsRouter);
 router.use(billableItemsRouter);
 router.use(reportTemplatesRouter);
+router.use(pkbRouter);
 
 export default router;

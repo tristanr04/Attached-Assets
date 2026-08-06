@@ -202,6 +202,220 @@ async function seed() {
   await q(`INSERT INTO report_equipment (report_id, name, hours_used) VALUES ($1,$2,$3)`, [r3.id, "Crane Service Truck #5", 4]);
   await q(`INSERT INTO report_equipment (report_id, name, hours_used) VALUES ($1,$2,$3)`, [r3.id, "Aerial Lift Bucket Truck #4", 4]);
 
+  // ── PKB Demo: Red River Electric Utility ─────────────────────────────────
+  console.log("Seeding PKB demo data…");
+
+  // Pole Types
+  await q(`INSERT INTO pkb_pole_types (company_id, name, code, material, nominal_height, pole_class, operational_class, access_type, customer_id, version_status, is_active, description)
+    VALUES ($1,'45ft Class 3 Wood Tangent','PT-W45C3','wood',45,'3','distribution','roadside','Red River Electric','active',true,'Standard 45-foot Class 3 wood pole for single and three-phase tangent structures.')
+    ON CONFLICT DO NOTHING`, [companyId]);
+  await q(`INSERT INTO pkb_pole_types (company_id, name, code, material, nominal_height, pole_class, operational_class, access_type, customer_id, version_status, is_active, description)
+    VALUES ($1,'50ft Class 2 Wood Backyard','PT-W50C2-BY','wood',50,'2','distribution','backyard','Red River Electric','active',true,'50-foot Class 2 wood pole for backyard or restricted-access locations requiring specialty equipment.')
+    ON CONFLICT DO NOTHING`, [companyId]);
+  await q(`INSERT INTO pkb_pole_types (company_id, name, code, material, nominal_height, pole_class, operational_class, access_type, customer_id, version_status, is_active, description)
+    VALUES ($1,'55ft Class 1 Steel Transmission','PT-S55C1-TX','steel',55,'1','transmission','roadside','Red River Electric','active',true,'55-foot Class 1 steel pole for transmission and subtransmission structures.')
+    ON CONFLICT DO NOTHING`, [companyId]);
+
+  // Structure Configurations
+  await q(`INSERT INTO pkb_structure_configs (company_id, name, code, phases, conductor_arrangement, crossarm_config, guying_requirements, required_photos, customer_id, version_status, is_active)
+    VALUES ($1,'Single-Phase Tangent','SC-1PH-TAN',1,'vertical','none','none','[{"category":"full_pole","label":"Full Pole","required":true},{"category":"pole_tag","label":"Pole Tag","required":true},{"category":"top_framing","label":"Top Framing","required":true}]','Red River Electric','active',true)
+    ON CONFLICT DO NOTHING`, [companyId]);
+  await q(`INSERT INTO pkb_structure_configs (company_id, name, code, phases, conductor_arrangement, crossarm_config, guying_requirements, required_photos, customer_id, version_status, is_active)
+    VALUES ($1,'Three-Phase Tangent','SC-3PH-TAN',3,'horizontal','single_crossarm','none','[{"category":"full_pole","label":"Full Pole","required":true},{"category":"pole_tag","label":"Pole Tag","required":true},{"category":"top_framing","label":"Top Framing","required":true},{"category":"before_work","label":"Before Work","required":true},{"category":"after_work","label":"After Work","required":true}]','Red River Electric','active',true)
+    ON CONFLICT DO NOTHING`, [companyId]);
+  await q(`INSERT INTO pkb_structure_configs (company_id, name, code, phases, conductor_arrangement, crossarm_config, guying_requirements, required_photos, customer_id, version_status, is_active)
+    VALUES ($1,'Three-Phase Dead-End','SC-3PH-DE',3,'horizontal','double_crossarm','down_guy_anchor','[{"category":"full_pole","label":"Full Pole","required":true},{"category":"pole_tag","label":"Pole Tag","required":true},{"category":"top_framing","label":"Top Framing","required":true},{"category":"base","label":"Base & Guying","required":true},{"category":"before_work","label":"Before Work","required":true},{"category":"after_work","label":"After Work","required":true}]','Red River Electric','active',true)
+    ON CONFLICT DO NOTHING`, [companyId]);
+  await q(`INSERT INTO pkb_structure_configs (company_id, name, code, phases, conductor_arrangement, crossarm_config, guying_requirements, required_photos, customer_id, version_status, is_active)
+    VALUES ($1,'Transformer Pole (Single)','SC-XFMR-1',1,'vertical','none','none','[{"category":"full_pole","label":"Full Pole","required":true},{"category":"pole_tag","label":"Pole Tag","required":true},{"category":"transformer","label":"Transformer","required":true},{"category":"before_work","label":"Before Work","required":true},{"category":"after_work","label":"After Work","required":true}]','Red River Electric','active',true)
+    ON CONFLICT DO NOTHING`, [companyId]);
+  await q(`INSERT INTO pkb_structure_configs (company_id, name, code, phases, conductor_arrangement, crossarm_config, guying_requirements, required_photos, customer_id, version_status, is_active)
+    VALUES ($1,'Riser Pole','SC-RISER',1,'vertical','none','side_guy','[{"category":"full_pole","label":"Full Pole","required":true},{"category":"pole_tag","label":"Pole Tag","required":true},{"category":"base","label":"Riser & Base","required":true}]','Red River Electric','active',true)
+    ON CONFLICT DO NOTHING`, [companyId]);
+
+  // Components
+  const components = [
+    ['Pole','COMP-POLE','pole_and_framing','The main structural pole — wood, steel, concrete, or composite.'],
+    ['Crossarm','COMP-XARM','pole_and_framing','Horizontal arm attached to the pole to support conductors.'],
+    ['Primary Conductor','COMP-COND-PRI','conductor_and_service','Energized conductor carrying primary voltage (distribution or transmission).'],
+    ['Neutral Conductor','COMP-COND-NEU','conductor_and_service','Grounded neutral conductor running below primary conductors.'],
+    ['Single Transformer','COMP-XFMR-1','transformer_equipment','Single-phase distribution transformer mounted on pole or platform.'],
+    ['Down Guy','COMP-GUY-DWN','guying_and_anchors','Wire guy running from pole attachment point to ground anchor.'],
+    ['Screw Anchor','COMP-ANCHOR-SCR','guying_and_anchors','Helical screw anchor installed in ground to terminate down guy.'],
+    ['Cutout','COMP-CUTOUT','protection_and_switching','Fused cutout protecting a transformer or lateral tap.'],
+    ['Arrester','COMP-ARRESTER','protection_and_switching','Surge arrester protecting equipment from lightning overvoltage.'],
+    ['Ground Rod','COMP-GRD-ROD','pole_and_framing','Copper ground rod driven at pole base for grounding.'],
+  ];
+  for (const [name, code, category, desc] of components) {
+    await q(`INSERT INTO pkb_components (company_id, name, code, category, visual_description, customer_id, version_status, is_active)
+      VALUES ($1,$2,$3,$4,$5,'Red River Electric','active',true) ON CONFLICT DO NOTHING`,
+      [companyId, name, code, category, desc]);
+  }
+
+  // Work Actions
+  const workActions = [
+    ['Install New Pole','WA-POLE-INST','COMP-POLE','install','Set and plumb a new pole in a pre-excavated or augered hole.','New pole is plumb, in-ground, and ready for equipment attachment.'],
+    ['Remove Existing Pole','WA-POLE-REM','COMP-POLE','remove','Pull and dispose of the old pole after transfer is complete.','Old pole removed from hole; hole backfilled.'],
+    ['Transfer Primary Conductor','WA-COND-TFR-PRI','COMP-COND-PRI','transfer','Move primary conductors from old pole to new pole framing.','Conductors secured at new insulator positions.'],
+    ['Transfer Neutral','WA-COND-TFR-NEU','COMP-COND-NEU','transfer','Move neutral conductor from old pole deadend to new pole.','Neutral reterminated and tied on new pole.'],
+    ['Install Crossarm','WA-XARM-INST','COMP-XARM','install','Attach and through-bolt crossarm to pole.','Crossarm level, squared, and through-bolted.'],
+    ['Install Down Guy & Anchor','WA-GUY-INST','COMP-GUY-DWN','install','Install screw or expanding anchor and attach down guy from pole to anchor.','Guy taut, guard installed, anchor fully driven.'],
+    ['Transfer Transformer','WA-XFMR-TFR','COMP-XFMR-1','transfer','Lower transformer from old pole, mount on new pole or platform.','Transformer mounted, connected, and energized.'],
+    ['Install Cutout','WA-CUTOUT-INST','COMP-CUTOUT','install','Mount cutout bracket, attach cutout, and connect fuse link.','Cutout mounted level, fuse link correct rating, operability confirmed.'],
+  ];
+  for (const [name, code, compCode, actionType, desc, evidence] of workActions) {
+    await q(`INSERT INTO pkb_work_actions (company_id, name, code, component_code, action_type, description, visible_evidence, requires_human_confirmation, customer_id, version_status, is_active)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,true,'Red River Electric','active',true) ON CONFLICT DO NOTHING`,
+      [companyId, name, code, compCode, actionType, desc, evidence]);
+  }
+
+  // Work Packages
+  await q(`INSERT INTO pkb_work_packages (company_id, name, code, customer_id, access_type, pole_material, pole_height, pole_class, version_status, is_active,
+    expected_work, resources, documentation, billing)
+    VALUES ($1,'45ft Class 3 Single-Phase Pole Replacement','WP-1PH-45C3-REPL','Red River Electric','roadside','wood','45','3','active',true,
+    $2,$3,$4,$5) ON CONFLICT DO NOTHING`, [
+    companyId,
+    JSON.stringify([
+      {workActionCode:'WA-POLE-INST',type:'required',defaultQty:1},
+      {workActionCode:'WA-POLE-REM',type:'required',defaultQty:1},
+      {workActionCode:'WA-COND-TFR-PRI',type:'required',defaultQty:1},
+      {workActionCode:'WA-COND-TFR-NEU',type:'required',defaultQty:1},
+    ]),
+    JSON.stringify({laborClassifications:['Journeyman Lineman','Equipment Operator'],equipment:['Digger Derrick','Aerial Lift']}),
+    JSON.stringify({requiredPhotos:[
+      {category:'full_pole',label:'Full Pole',required:true},
+      {category:'pole_tag',label:'Pole Tag',required:true},
+      {category:'before_work',label:'Before Work',required:true},
+      {category:'after_work',label:'After Work',required:true}
+    ],gpsRequired:true,signatureRequired:false}),
+    JSON.stringify({requiredCodes:[
+      {code:'RRE-POLE-SET-45C3',description:'45ft Class 3 Pole Set',unitType:'each',minCharge:1},
+      {code:'RRE-POLE-REM',description:'Existing Pole Removal & Disposal',unitType:'each',minCharge:1},
+      {code:'RRE-DD-HRLY',description:'Digger Derrick Hourly',unitType:'hour',minCharge:4}
+    ]})
+  ]);
+
+  await q(`INSERT INTO pkb_work_packages (company_id, name, code, customer_id, access_type, pole_material, pole_height, pole_class, version_status, is_active,
+    expected_work, resources, documentation, billing)
+    VALUES ($1,'45ft Class 3 Three-Phase Pole Replacement','WP-3PH-45C3-REPL','Red River Electric','roadside','wood','45','3','active',true,
+    $2,$3,$4,$5) ON CONFLICT DO NOTHING`, [
+    companyId,
+    JSON.stringify([
+      {workActionCode:'WA-POLE-INST',type:'required',defaultQty:1},
+      {workActionCode:'WA-POLE-REM',type:'required',defaultQty:1},
+      {workActionCode:'WA-XARM-INST',type:'required',defaultQty:1},
+      {workActionCode:'WA-COND-TFR-PRI',type:'required',defaultQty:3},
+      {workActionCode:'WA-COND-TFR-NEU',type:'required',defaultQty:1},
+    ]),
+    JSON.stringify({laborClassifications:['Journeyman Lineman','Equipment Operator'],equipment:['Digger Derrick','Aerial Lift']}),
+    JSON.stringify({requiredPhotos:[
+      {category:'full_pole',label:'Full Pole',required:true},
+      {category:'pole_tag',label:'Pole Tag',required:true},
+      {category:'top_framing',label:'Top Framing',required:true},
+      {category:'before_work',label:'Before Work',required:true},
+      {category:'after_work',label:'After Work',required:true}
+    ],gpsRequired:true,signatureRequired:false}),
+    JSON.stringify({requiredCodes:[
+      {code:'RRE-POLE-SET-45C3',description:'45ft Class 3 Pole Set',unitType:'each',minCharge:1},
+      {code:'RRE-POLE-REM',description:'Existing Pole Removal & Disposal',unitType:'each',minCharge:1},
+      {code:'RRE-XARM-INST',description:'Crossarm Installation',unitType:'each',minCharge:1},
+      {code:'RRE-DD-HRLY',description:'Digger Derrick Hourly',unitType:'hour',minCharge:4}
+    ]})
+  ]);
+
+  await q(`INSERT INTO pkb_work_packages (company_id, name, code, customer_id, access_type, pole_material, pole_height, pole_class, version_status, is_active,
+    expected_work, resources, documentation, billing)
+    VALUES ($1,'50ft Backyard Pole Replacement','WP-BY-50C2-REPL','Red River Electric','backyard','wood','50','2','active',true,
+    $2,$3,$4,$5) ON CONFLICT DO NOTHING`, [
+    companyId,
+    JSON.stringify([
+      {workActionCode:'WA-POLE-INST',type:'required',defaultQty:1},
+      {workActionCode:'WA-POLE-REM',type:'required',defaultQty:1},
+      {workActionCode:'WA-COND-TFR-PRI',type:'required',defaultQty:1},
+      {workActionCode:'WA-COND-TFR-NEU',type:'required',defaultQty:1},
+    ]),
+    JSON.stringify({laborClassifications:['Journeyman Lineman','Equipment Operator'],equipment:['Mini Digger','Aerial Lift']}),
+    JSON.stringify({requiredPhotos:[
+      {category:'full_pole',label:'Full Pole',required:true},
+      {category:'pole_tag',label:'Pole Tag',required:true},
+      {category:'before_work',label:'Before Work (Access)',required:true},
+      {category:'after_work',label:'After Work',required:true}
+    ],gpsRequired:true,signatureRequired:true}),
+    JSON.stringify({requiredCodes:[
+      {code:'RRE-POLE-SET-50C2',description:'50ft Class 2 Pole Set',unitType:'each',minCharge:1},
+      {code:'RRE-POLE-REM',description:'Existing Pole Removal & Disposal',unitType:'each',minCharge:1},
+      {code:'RRE-BACKYARD-ACCESS',description:'Backyard Machine Access Charge',unitType:'day',minCharge:1},
+      {code:'RRE-MOB-SPEC',description:'Specialty Equipment Mobilization',unitType:'each',minCharge:1}
+    ]})
+  ]);
+
+  await q(`INSERT INTO pkb_work_packages (company_id, name, code, customer_id, access_type, pole_material, version_status, is_active,
+    expected_work, resources, documentation, billing)
+    VALUES ($1,'Transformer Transfer Package','WP-XFMR-TFR','Red River Electric','roadside','wood','active',true,
+    $2,$3,$4,$5) ON CONFLICT DO NOTHING`, [
+    companyId,
+    JSON.stringify([
+      {workActionCode:'WA-XFMR-TFR',type:'required',defaultQty:1},
+    ]),
+    JSON.stringify({laborClassifications:['Journeyman Lineman'],equipment:['Aerial Lift']}),
+    JSON.stringify({requiredPhotos:[
+      {category:'transformer',label:'Transformer (Before)',required:true},
+      {category:'transformer',label:'Transformer (After)',required:true},
+    ],gpsRequired:false,signatureRequired:false}),
+    JSON.stringify({requiredCodes:[
+      {code:'RRE-XFMR-TFR-1',description:'Single Transformer Transfer',unitType:'each',minCharge:1},
+      {code:'RRE-XFMR-EQUIP',description:'Transformer Handling Equipment',unitType:'hour',minCharge:2}
+    ]})
+  ]);
+
+  // Billing Mappings
+  const billingMappings = [
+    ['WA-POLE-INST','RRE-POLE-SET-45C3','45ft Class 3 Pole Set','each',1,1,null,850.00],
+    ['WA-POLE-INST','RRE-POLE-SET-50C2','50ft Class 2 Pole Set','each',1,1,null,1050.00],
+    ['WA-POLE-REM','RRE-POLE-REM','Existing Pole Removal & Disposal','each',1,1,null,325.00],
+    ['WA-XARM-INST','RRE-XARM-INST','Crossarm Installation','each',1,2,null,145.00],
+    ['WA-XFMR-TFR','RRE-XFMR-TFR-1','Single Transformer Transfer','each',1,1,null,485.00],
+    ['WA-GUY-INST','RRE-GUY-ANCHOR','Down Guy & Anchor Installation','each',1,4,null,275.00],
+  ];
+  for (const [waCode, bCode, desc, unitType, defaultQty, minQty, maxQty, unitRate] of billingMappings) {
+    await q(`INSERT INTO pkb_billing_mappings (company_id, work_action_code, billing_code, description, unit_type, default_quantity, min_quantity, unit_rate, customer_id, version_status, is_active)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'Red River Electric','active',true) ON CONFLICT DO NOTHING`,
+      [companyId, waCode, bCode, desc, unitType, defaultQty, minQty, unitRate]);
+  }
+
+  // Conditional Rules (spec §12 examples)
+  await q(`INSERT INTO pkb_conditional_rules (company_id, name, description, customer_id, conditions, suggestions, is_active, priority)
+    VALUES ($1,'Backyard Access Charge','Add specialty access charge when work is performed in a backyard location','Red River Electric',
+    $2,$3,true,10) ON CONFLICT DO NOTHING`, [
+    companyId,
+    JSON.stringify([{field:'accessType',operator:'equals',value:'backyard'}]),
+    JSON.stringify([
+      {billingCode:'RRE-BACKYARD-ACCESS',description:'Backyard Machine Access Charge',unitType:'day',defaultQty:1,requiresApproval:false},
+      {billingCode:'RRE-MOB-SPEC',description:'Specialty Equipment Mobilization',unitType:'each',defaultQty:1,requiresApproval:false}
+    ])
+  ]);
+
+  await q(`INSERT INTO pkb_conditional_rules (company_id, name, description, customer_id, conditions, suggestions, is_active, priority)
+    VALUES ($1,'Transformer Transfer Billing','Add transformer transfer charge when transformer is confirmed transferred','Red River Electric',
+    $2,$3,true,20) ON CONFLICT DO NOTHING`, [
+    companyId,
+    JSON.stringify([{field:'confirmedWorkActions',operator:'contains',value:'WA-XFMR-TFR'}]),
+    JSON.stringify([
+      {billingCode:'RRE-XFMR-TFR-1',description:'Single Transformer Transfer',unitType:'each',defaultQty:1,requiresApproval:false},
+      {billingCode:'RRE-XFMR-EQUIP',description:'Transformer Handling Equipment',unitType:'hour',defaultQty:2,requiresApproval:false}
+    ])
+  ]);
+
+  await q(`INSERT INTO pkb_conditional_rules (company_id, name, description, customer_id, conditions, suggestions, is_active, priority)
+    VALUES ($1,'Dead-End Structure Guying','Suggest guy and anchor charges for dead-end structures','Red River Electric',
+    $2,$3,true,30) ON CONFLICT DO NOTHING`, [
+    companyId,
+    JSON.stringify([{field:'structureConfig',operator:'contains',value:'dead_end'}]),
+    JSON.stringify([
+      {billingCode:'RRE-GUY-ANCHOR',description:'Down Guy & Anchor Installation',unitType:'each',defaultQty:2,requiresApproval:false}
+    ])
+  ]);
+
   console.log("SEED COMPLETE");
   await pool.end();
 }

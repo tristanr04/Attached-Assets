@@ -41,6 +41,7 @@ async function enrichReport(r: typeof dailyReportsTable.$inferSelect) {
     safetyMeeting: r.safetyMeeting, safetyNotes: r.safetyNotes, delays: r.delays, outages: r.outages,
     customerIssues: r.customerIssues, injuries: r.injuries, injuryDetails: r.injuryDetails,
     additionalNotes: r.additionalNotes,
+    workPackageId: r.workPackageId ?? null,
     completedAt: r.completedAt?.toISOString() ?? null,
     createdAt: r.createdAt.toISOString(), updatedAt: r.updatedAt.toISOString(),
   };
@@ -170,7 +171,7 @@ router.patch("/reports/:reportId", requireAuth, async (req: AuthenticatedRequest
 
   const allowed = ["projectId","crewId","reportDate","workLocation","generalForeman","startTime","stopTime",
     "weatherConditions","workPerformed","structuresInstalled","safetyMeeting","safetyNotes",
-    "delays","outages","customerIssues","injuries","injuryDetails","additionalNotes"];
+    "delays","outages","customerIssues","injuries","injuryDetails","additionalNotes","workPackageId"];
   const updates: Record<string, unknown> = {};
   for (const key of allowed) {
     if (req.body[key] !== undefined) updates[key] = req.body[key];

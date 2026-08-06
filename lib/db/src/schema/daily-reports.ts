@@ -31,6 +31,7 @@ export const dailyReportsTable = pgTable("daily_reports", {
   injuries: boolean("injuries"),
   injuryDetails: text("injury_details"),
   additionalNotes: text("additional_notes"),
+  workPackageId: integer("work_package_id"),
   completedAt: timestamp("completed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),

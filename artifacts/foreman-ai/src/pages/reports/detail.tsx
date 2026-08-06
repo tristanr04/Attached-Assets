@@ -7,7 +7,7 @@ import {
   useListReportEquipment, getListReportEquipmentQueryKey,
 } from "@workspace/api-client-react";
 import { useApiQuery } from "@/hooks/use-api";
-import { Loader2, Printer, Edit2, CheckCircle2, AlertTriangle, Users, Package, Truck, HardHat, ChevronDown, Camera, ZoomIn, X } from "lucide-react";
+import { Loader2, Printer, Edit2, CheckCircle2, AlertTriangle, Users, Package, Truck, HardHat, ChevronDown, Camera, ZoomIn, X, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -76,6 +76,9 @@ export default function ReportDetailPage({ id }: { id: number }) {
       <div className="hidden md:flex gap-3 mb-6">
         <Link href={`/reports/${id}/print`}>
           <Button variant="outline" className="font-bold gap-2"><Printer className="h-4 w-4" /> Print</Button>
+        </Link>
+        <Link href={`/reports/${id}/billing`}>
+          <Button variant="outline" className="font-bold gap-2 border-primary/40 text-primary hover:bg-primary/10"><DollarSign className="h-4 w-4" /> Billing Review</Button>
         </Link>
         {report.status === 'draft' && (
           <Link href={`/reports/${id}/edit`}>
