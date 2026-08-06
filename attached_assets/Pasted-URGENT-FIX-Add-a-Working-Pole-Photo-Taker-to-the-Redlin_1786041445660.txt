@@ -1,0 +1,393 @@
+URGENT FIX: Add a Working Pole Photo Taker to the Redline App
+
+Current problem:
+
+There is still no visible or usable camera/photo-taking feature in the Redline app.
+
+The prior requirement was not completed.
+
+Do not add unrelated features in this task.
+
+The goal is to deliver a fully working mobile photo-capture workflow that a foreman can use from the daily report and pole-identification screens.
+
+==================================================
+1. FIND THE MISSING IMPLEMENTATION
+==================================================
+
+Inspect the current codebase and determine:
+
+- Whether a camera component exists but is not rendered
+- Whether the route exists but is unreachable
+- Whether the button exists but is hidden by layout or permissions
+- Whether photo upload exists without direct camera capture
+- Whether the database model exists without a working UI
+- Whether mobile browser permissions are failing
+- Whether the feature was mocked instead of implemented
+
+Document the root cause and fix it.
+
+==================================================
+2. ADD A VISIBLE CAMERA ACTION
+==================================================
+
+Add a large, obvious button labeled:
+
+“Take Pole Photo”
+
+Place it in all relevant locations:
+
+- Daily report creation
+- Daily report edit
+- Pole identification
+- Work-package selection
+- Photo evidence section
+
+Also add:
+
+“Upload Existing Photo”
+
+The user must be able to choose either action.
+
+Do not hide the feature inside an admin page or settings menu.
+
+==================================================
+3. MOBILE CAMERA CAPTURE
+==================================================
+
+Implement direct mobile camera capture using the browser/device-supported file input approach.
+
+Use an input compatible with mobile devices, including:
+
+- accept="image/*"
+- capture="environment"
+
+The default should request the rear-facing camera when supported.
+
+Provide a fallback to the normal photo library when direct camera capture is unavailable.
+
+Do not require a native mobile app for the first working version.
+
+==================================================
+4. PHOTO CAPTURE FLOW
+==================================================
+
+The complete flow must be:
+
+1. User taps “Take Pole Photo.”
+2. Mobile device opens the camera when supported.
+3. User takes the photo.
+4. The app displays a preview.
+5. User can:
+   - Use photo
+   - Retake
+   - Cancel
+6. The photo uploads.
+7. Upload progress is shown.
+8. The saved photo appears in the report.
+9. The report can be saved and reopened with the photo still attached.
+
+Do not immediately upload before the user accepts the preview unless required by the existing architecture.
+
+==================================================
+5. MULTIPLE REQUIRED PHOTO TYPES
+==================================================
+
+Support photo categories:
+
+- Full pole
+- Pole tag or stamp
+- Pole top and framing
+- Transformer or attached equipment
+- Pole base
+- Damage
+- Before work
+- During work
+- After work
+- Other
+
+Allow the user to take multiple photos.
+
+Display a clear checklist:
+
+- Full pole photo
+- Tag close-up
+- Framing photo
+- Additional photo
+
+The company or work-package template should be able to determine which categories are required.
+
+==================================================
+6. PHOTO PREVIEW AND MANAGEMENT
+==================================================
+
+For each photo, display:
+
+- Thumbnail
+- Category
+- Caption
+- Upload status
+- Capture or upload timestamp
+
+Allow the user to:
+
+- View full image
+- Retake before submission
+- Replace before submission
+- Change category
+- Add caption
+- Delete before submission
+- Retry failed upload
+
+Do not allow ordinary users to delete evidence from an approved or locked report.
+
+==================================================
+7. PERMISSIONS AND ERROR HANDLING
+==================================================
+
+Handle:
+
+- Camera permission denied
+- Camera unavailable
+- Unsupported browser
+- User cancels camera
+- File too large
+- Unsupported file type
+- Upload failure
+- Network loss
+- Server error
+
+Show visible error messages.
+
+Never fail silently.
+
+Example:
+
+“Camera access was not available. You can upload a photo from your library instead.”
+
+==================================================
+8. IMAGE VALIDATION
+==================================================
+
+Accept common image formats:
+
+- JPEG
+- JPG
+- PNG
+- HEIC or HEIF when supported by the current backend
+- WebP when supported
+
+If HEIC is not supported by the existing processing pipeline:
+
+- Detect it
+- Convert it safely when possible
+- Or show a clear message explaining the limitation
+
+Validate:
+
+- File type
+- File size
+- Corrupt image
+- Empty file
+- Duplicate upload
+
+Do not rely only on the filename extension.
+
+==================================================
+9. IMAGE COMPRESSION
+==================================================
+
+Compress large mobile photos before or during upload while preserving enough detail for:
+
+- Pole identification
+- Pole-tag reading
+- Framing review
+- Billing evidence
+
+Preserve the original image only if the current storage and security architecture supports it.
+
+Generate thumbnails for fast report loading.
+
+Do not make the user wait on full-resolution images unnecessarily.
+
+==================================================
+10. DATABASE PERSISTENCE
+==================================================
+
+Verify photos are persisted in the database and file-storage system.
+
+Each photo should connect to:
+
+- Company
+- User
+- Project
+- Work order
+- Daily report
+- Work package when applicable
+- Photo category
+- Upload status
+- Storage key
+- Thumbnail key
+- Created timestamp
+- Updated timestamp
+
+Do not store image bytes directly in ordinary browser local storage.
+
+Do not expose raw private storage paths publicly.
+
+==================================================
+11. COMPANY ISOLATION
+==================================================
+
+Verify:
+
+- Company A cannot access Company B’s photos
+- Photo URLs require authorization or signed temporary access
+- Deleted or revoked users cannot continue accessing private photos
+- Customer portal users only see explicitly approved photos
+- Pricing and unrelated report data are not exposed through photo endpoints
+
+Enforce this server-side.
+
+==================================================
+12. CONNECT TO POLE RECOGNITION
+==================================================
+
+After a photo is successfully saved, show a button:
+
+“Analyze Pole Photo”
+
+If the vision provider is currently configured:
+
+- Send the saved photo through the existing recognition service
+- Show progress
+- Return structured suggestions
+- Require foreman confirmation
+
+If the provider is not configured:
+
+- Keep the photo capture fully operational
+- Show:
+  “Photo saved. Automated pole analysis is not configured yet.”
+- Do not display fake recognition results
+
+Photo capture must work independently of AI recognition.
+
+==================================================
+13. OFFLINE OR POOR CONNECTION
+==================================================
+
+When possible within the existing architecture:
+
+- Preserve an unsent photo draft
+- Show “Waiting to upload”
+- Retry when connection returns
+- Prevent duplicate uploads
+- Keep the rest of the report usable
+
+Do not claim offline photo storage works unless it is actually implemented and tested.
+
+==================================================
+14. MOBILE LAYOUT
+==================================================
+
+The camera buttons and preview must fit properly at:
+
+- 320px
+- 375px
+- 390px
+- 430px
+
+Requirements:
+
+- No horizontal overflow
+- Large buttons
+- Buttons not hidden behind the home indicator
+- Preview fits the screen
+- Retake and accept buttons remain visible
+- Mobile keyboard does not cover caption input
+- Modals fit within viewport
+
+==================================================
+15. REQUIRED USER INTERFACE
+==================================================
+
+On the daily report page, the user should visibly see:
+
+PHOTO EVIDENCE
+
+[ Take Pole Photo ]
+
+[ Upload Existing Photo ]
+
+Required photos:
+- Full pole: Missing
+- Pole tag: Missing
+- Top framing: Missing
+
+Uploaded photos:
+- Thumbnail
+- Category
+- Status
+
+Do not consider the task complete if the feature only exists in backend code or tests.
+
+==================================================
+16. TESTING
+==================================================
+
+Test on mobile-sized browser views and, when the environment supports it, a real mobile browser.
+
+Test cases:
+
+1. Tap Take Pole Photo.
+2. Camera opens or fallback is offered.
+3. Take photo.
+4. Preview appears.
+5. Retake works.
+6. Accept works.
+7. Upload progress appears.
+8. Photo persists after refresh.
+9. Multiple photos can be added.
+10. Category can be changed.
+11. Caption can be added.
+12. Failed upload can be retried.
+13. Camera denial shows an error.
+14. Library upload works.
+15. Unauthorized company cannot access photo.
+16. Approved report protects evidence.
+17. Analyze Pole Photo action appears after upload.
+18. Mobile layout does not overflow.
+
+Add automated tests where practical, but also manually verify the visible user flow.
+
+==================================================
+17. COMPLETION REQUIREMENT
+==================================================
+
+Do not stop after adding an icon, placeholder, or hidden file input.
+
+This task is complete only when:
+
+- A visible Take Pole Photo button exists
+- It opens the mobile camera when supported
+- The user can preview and accept or retake
+- The image uploads successfully
+- The image persists after refresh
+- Multiple categorized photos are supported
+- Errors are visible
+- Company isolation is enforced
+- The Analyze Pole Photo action is connected or honestly labeled unavailable
+- The full workflow is usable on a phone
+
+At completion, report:
+
+1. Why the feature was previously missing
+2. Files changed
+3. Routes or APIs added
+4. Storage behavior
+5. Camera behavior
+6. Supported formats
+7. Mobile testing performed
+8. Security checks performed
+9. Whether AI analysis is live or still unconfigured
+10. Any remaining limitations

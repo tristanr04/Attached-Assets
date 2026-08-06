@@ -1,19 +1,37 @@
-import { useParams, Link } from "wouter";
-import { useCompanyStore } from "@/hooks/use-company-store";
+import { useState } from "react";
+import { Link } from "wouter";
 import { 
   useGetReport, getGetReportQueryKey, 
   useListTimeEntries, getListTimeEntriesQueryKey,
   useListReportMaterials, getListReportMaterialsQueryKey,
-  useListReportEquipment, getListReportEquipmentQueryKey
+  useListReportEquipment, getListReportEquipmentQueryKey,
 } from "@workspace/api-client-react";
-import { Loader2, Printer, Edit2, CheckCircle2, AlertTriangle, Users, Package, Truck, HardHat, ChevronDown } from "lucide-react";
+import { useApiQuery } from "@/hooks/use-api";
+import { Loader2, Printer, Edit2, CheckCircle2, AlertTriangle, Users, Package, Truck, HardHat, ChevronDown, Camera, ZoomIn, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { format } from "date-fns";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
+const PHOTO_CATEGORY_LABELS: Record<string, string> = {
+  full_pole: "Full Pole", pole_tag: "Pole Tag / Stamp", top_framing: "Top Framing",
+  transformer: "Transformer / Equipment", base: "Pole Base", damage: "Damage",
+  before_work: "Before Work", during_work: "During Work", after_work: "After Work", other: "Other",
+};
+
+function PhotoLightbox({ url, onClose }: { url: string; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4" onClick={onClose}>
+      <button className="absolute top-4 right-4 text-white bg-white/10 rounded-full p-2 hover:bg-white/20" onClick={onClose}><X className="h-6 w-6" /></button>
+      <img src={url} alt="Full view" className="max-w-full max-h-full object-contain rounded-lg" onClick={(e) => e.stopPropagation()} />
+    </div>
+  );
+}
+
 export default function ReportDetailPage({ id }: { id: number }) {
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+
   const { data: report, isLoading: isReportLoading } = useGetReport(id, {
     query: { enabled: !!id, queryKey: getGetReportQueryKey(id) }
   });
@@ -30,6 +48,8 @@ export default function ReportDetailPage({ id }: { id: number }) {
     query: { enabled: !!id, queryKey: getListReportEquipmentQueryKey(id) }
   });
 
+  const { data: photos = [] } = useApiQuery<any[]>(`/api/reports/${id}/photos`, !!id);
+
   const isLoading = isReportLoading || isTimeLoading || isMatLoading || isEqLoading;
 
   if (isLoading) {
@@ -40,6 +60,7 @@ export default function ReportDetailPage({ id }: { id: number }) {
 
   return (
     <div className="pb-24 md:pb-8 space-y-4 md:space-y-8">
+      {lightboxUrl && <PhotoLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />}
       <div className="flex flex-col justify-start gap-2 mb-2">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl md:text-4xl font-extrabold tracking-tight uppercase">Daily Report</h1>
@@ -182,6 +203,44 @@ export default function ReportDetailPage({ id }: { id: number }) {
                     <div className="font-bold">{item.name}</div>
                     <div className="font-mono font-bold">{item.quantity} <span className="text-muted-foreground text-sm ml-1">{item.unit}</span></div>
                   </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+
+      {/* Photos */}
+      <Collapsible defaultOpen={photos.length > 0} className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
+        <CollapsibleTrigger className="w-full flex items-center justify-between p-4 md:p-6 bg-secondary/20 hover:bg-secondary/40 font-bold uppercase tracking-widest text-sm">
+          <div className="flex items-center gap-2"><Camera className="w-5 h-5 text-primary"/> Photo Evidence <Badge variant="secondary" className="ml-2">{photos.length}</Badge></div>
+          <ChevronDown className="w-5 h-5 text-muted-foreground" />
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="p-3 md:p-4 border-t border-border">
+            {photos.length === 0 ? (
+              <div className="text-center py-6 text-muted-foreground font-medium">
+                No photos attached.{report.status === 'draft' && <span> <Link href={`/reports/${id}/edit`} className="text-primary underline font-bold">Edit report</Link> to add photos.</span>}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {photos.map((photo: any) => (
+                  <button
+                    key={photo.id}
+                    onClick={() => setLightboxUrl(photo.url)}
+                    className="group relative rounded-xl overflow-hidden border border-border bg-muted aspect-square"
+                    title={PHOTO_CATEGORY_LABELS[photo.category] ?? "Photo"}
+                  >
+                    <img src={photo.url} alt={photo.caption || PHOTO_CATEGORY_LABELS[photo.category] || "Photo"} className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-end justify-start p-2">
+                      <span className="text-white text-[10px] font-bold uppercase tracking-wide bg-black/50 px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                        {PHOTO_CATEGORY_LABELS[photo.category ?? "other"] ?? "Photo"}
+                      </span>
+                    </div>
+                    <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="bg-black/50 rounded-full p-1"><ZoomIn className="h-3 w-3 text-white" /></div>
+                    </div>
+                  </button>
                 ))}
               </div>
             )}

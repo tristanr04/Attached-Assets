@@ -72,7 +72,14 @@ function formatEquipment(e: typeof reportEquipmentTable.$inferSelect) {
 }
 
 function formatPhoto(p: typeof photosTable.$inferSelect) {
-  return { id: p.id, reportId: p.reportId, url: p.url, caption: p.caption, createdAt: p.createdAt.toISOString() };
+  return {
+    id: p.id,
+    reportId: p.reportId,
+    url: p.url,
+    caption: p.caption,
+    category: p.category ?? "other",
+    createdAt: p.createdAt.toISOString(),
+  };
 }
 
 function formatSignature(s: typeof signaturesTable.$inferSelect) {
@@ -410,11 +417,35 @@ router.post("/reports/:reportId/photos", requireAuth, async (req: AuthenticatedR
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
   const m = await checkAccess(req.clerkUserId, report.companyId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
-  const { dataUrl, caption } = req.body;
+  const { dataUrl, caption, category } = req.body;
   if (!dataUrl) { res.status(400).json({ error: "dataUrl is required" }); return; }
-  // Store the dataUrl directly as the "url" (MVP approach - no object storage yet)
-  const [photo] = await db.insert(photosTable).values({ reportId, url: dataUrl, caption: caption ?? null }).returning();
+  if (!dataUrl.startsWith("data:image/")) { res.status(400).json({ error: "dataUrl must be a valid image data URL" }); return; }
+  const [photo] = await db.insert(photosTable).values({
+    reportId,
+    url: dataUrl,
+    caption: caption ?? null,
+    category: category ?? "other",
+  }).returning();
   res.status(201).json(formatPhoto(photo));
+});
+
+router.patch("/reports/:reportId/photos/:photoId", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
+  if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const reportId = parseInt(req.params.reportId, 10);
+  const photoId = parseInt(req.params.photoId, 10);
+  const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
+  if (!report) { res.status(404).json({ error: "Not found" }); return; }
+  const m = await checkAccess(req.clerkUserId, report.companyId);
+  if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
+  if (report.status === "complete" && m.role === "foreman") { res.status(403).json({ error: "Cannot edit photos on a completed report" }); return; }
+  const { caption, category } = req.body;
+  const updates: Record<string, unknown> = { updatedAt: new Date() };
+  if (caption !== undefined) updates.caption = caption;
+  if (category !== undefined) updates.category = category;
+  const [updated] = await db.update(photosTable).set(updates)
+    .where(and(eq(photosTable.id, photoId), eq(photosTable.reportId, reportId))).returning();
+  if (!updated) { res.status(404).json({ error: "Not found" }); return; }
+  res.json(formatPhoto(updated));
 });
 
 router.delete("/reports/:reportId/photos/:photoId", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {

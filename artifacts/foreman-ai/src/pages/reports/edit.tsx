@@ -12,6 +12,7 @@ import StepBasics from "./steps/step-basics";
 import StepHours from "./steps/step-hours";
 import StepMaterials from "./steps/step-materials";
 import StepEquipment from "./steps/step-equipment";
+import StepPhotos from "./steps/step-photos";
 import StepSummary from "./steps/step-summary";
 import StepReview from "./steps/step-review";
 
@@ -20,6 +21,7 @@ const STEPS = [
   { id: 'hours', title: 'Hours' },
   { id: 'materials', title: 'Materials' },
   { id: 'equipment', title: 'Equipment' },
+  { id: 'photos', title: 'Photos' },
   { id: 'summary', title: 'Summary' },
   { id: 'review', title: 'Review & Sign' },
 ];
@@ -94,6 +96,7 @@ export default function ReportEditPage({ id }: { id: number }) {
     StepHours,
     StepMaterials,
     StepEquipment,
+    StepPhotos,
     StepSummary,
     StepReview
   ][currentStepIndex];
