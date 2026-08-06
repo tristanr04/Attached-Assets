@@ -1,0 +1,1925 @@
+PHASE: Commercialization, SaaS Billing, Implementation Management, Compliance Readiness, Support Operations, and Production Launch
+
+Objective:
+
+Prepare Redline to operate as a secure, sellable, multi-tenant SaaS platform for real utility contractors.
+
+This phase must build the commercial and operational systems required to:
+
+- Sell Redline to contractor companies
+- Configure company subscriptions
+- Manage contracts and pilots
+- Onboard new customers safely
+- Control feature access by plan
+- Track usage without exposing private operational data
+- Provide customer support
+- Manage implementation projects
+- Monitor application health
+- Respond to incidents
+- Protect customer data
+- Prepare for security and compliance reviews
+- Support production releases
+- Measure whether Redline saves time and prevents missed billing
+
+Do not remove, replace, or break existing:
+
+- Authentication
+- Company isolation
+- Multi-division structure
+- Employees and qualifications
+- Crews and scheduling
+- Work orders
+- Daily reports
+- Labor
+- Equipment
+- Fleet
+- Materials and inventory
+- Charge sheets
+- Billing rules
+- Missing-charge detection
+- Undercharge detection
+- Production tracking
+- Job costing
+- Invoice preparation
+- Change orders
+- T&M tickets
+- Custom forms
+- Photos
+- GPS
+- Signatures
+- Offline drafts
+- Customer portal
+- Pilot mode
+- Enterprise permissions
+- API architecture
+- Integration architecture
+- Audit history
+- Existing customer or demo data
+
+Before implementation:
+
+1. Inspect the complete repository.
+2. Review the database schema and all migrations.
+3. Review the current authentication, tenancy, billing, permissions, audit, support, and deployment architecture.
+4. Identify unfinished features, mocked integrations, unsafe assumptions, and duplicated systems.
+5. Run all tests, type checks, linting, builds, and migration checks.
+6. Record all existing failures.
+7. Fix blocking bugs before adding new features.
+8. Use safe, backward-compatible migrations.
+9. Preserve all historical operational and financial records.
+10. Do not reset the database.
+11. Do not activate paid third-party services without explicit authorization.
+12. Do not deploy automatically to production.
+
+==================================================
+1. SAAS TENANT MANAGEMENT
+==================================================
+
+Create a platform-level tenant administration system.
+
+A tenant represents a contractor company using Redline.
+
+Each tenant should support:
+
+- Legal company name
+- Display name
+- Tenant ID
+- Primary administrator
+- Billing contact
+- Technical contact
+- Support contact
+- Company size
+- Number of employees
+- Number of crews
+- Number of active projects
+- Primary industry segment
+- Contract start date
+- Subscription status
+- Pilot status
+- Account status
+- Data region
+- Time zone
+- Default currency
+- Created timestamp
+- Activated timestamp
+- Suspended timestamp
+- Cancelled timestamp
+- Notes
+
+Tenant statuses:
+
+- Prospect
+- Implementation
+- Pilot
+- Active
+- Past due
+- Suspended
+- Cancelled
+- Archived
+
+Tenant management must be restricted to authorized Redline platform administrators.
+
+Ordinary company administrators must never see other tenants.
+
+==================================================
+2. PLATFORM ADMINISTRATION
+==================================================
+
+Create a secure Redline platform-admin area.
+
+Platform administrators may manage:
+
+- Tenants
+- Subscription plans
+- Feature entitlements
+- Pilot accounts
+- Support cases
+- Usage summaries
+- System health
+- Release versions
+- Incident records
+- Implementation projects
+- Data exports requested by tenants
+- Account suspension
+- Emergency access requests
+
+Platform administrators must not automatically have unrestricted access to customer operational data.
+
+Build controlled support-access workflows instead of permanent universal access.
+
+==================================================
+3. CONTROLLED SUPPORT ACCESS
+==================================================
+
+Create a secure support-access system.
+
+When Redline staff need access to a tenant for troubleshooting:
+
+- Require an authorized tenant request or documented emergency reason.
+- Limit access to the minimum required scope.
+- Set an expiration time.
+- Record the support employee.
+- Record the reason.
+- Record the tenant.
+- Record the approved scope.
+- Record every action performed.
+- Notify the tenant administrator when appropriate.
+- Allow immediate revocation.
+- Automatically expire access.
+
+Support-access scopes may include:
+
+- View configuration
+- View report metadata
+- View error logs
+- Impersonate a user in read-only mode
+- Edit configuration with approval
+- Export diagnostic data
+
+Do not allow silent permanent impersonation.
+
+Do not reveal wages, internal costs, or private files unless explicitly included in the approved support scope.
+
+==================================================
+4. SUBSCRIPTION PLANS
+==================================================
+
+Create configurable SaaS subscription plans.
+
+Initial architecture may include:
+
+Pilot:
+- Limited users
+- Limited crews
+- Limited projects
+- Core reporting
+- Templates
+- Charge-sheet setup
+- Billing warnings
+- Pilot metrics
+
+Team:
+- Daily reporting
+- Crew templates
+- Labor and equipment
+- Charge sheets
+- Billing rules
+- Approvals
+- Basic production tracking
+- Basic exports
+
+Professional:
+- Advanced billing validation
+- Job costing
+- Production tracking
+- Invoice packages
+- Custom forms
+- Offline workflows
+- Customer portal
+- Advanced dashboards
+
+Enterprise:
+- Multi-division
+- Scheduling
+- Fleet
+- Inventory
+- Work orders
+- SSO architecture
+- API access
+- Advanced permissions
+- Implementation support
+- Enterprise reporting
+
+Custom:
+- Negotiated entitlements
+- Custom usage limits
+- Custom integrations
+- Contract-specific features
+
+Do not hard-code plan behavior across the UI.
+
+Use server-side entitlements.
+
+==================================================
+5. FEATURE ENTITLEMENTS
+==================================================
+
+Build a feature-entitlement system.
+
+Each feature should be controlled by:
+
+- Plan
+- Tenant
+- Pilot configuration
+- Contract override
+- User role
+- Division
+- Usage limit
+- Effective date
+- Expiration date
+
+Possible entitlements:
+
+- Daily reports
+- Number of users
+- Number of crews
+- Number of projects
+- Document storage
+- Photo storage
+- Charge-sheet imports
+- Billing rules
+- Custom forms
+- Offline mode
+- Production tracking
+- Job costing
+- Customer portal
+- Scheduling
+- Fleet
+- Inventory
+- API
+- SSO
+- Advanced exports
+- Custom integrations
+- Priority support
+
+Requirements:
+
+- Enforce entitlements server-side.
+- Do not delete data when a feature becomes unavailable.
+- Preserve historical records.
+- Explain locked features clearly.
+- Allow temporary trial access.
+- Allow tenant-specific overrides.
+- Record entitlement changes in audit history.
+
+==================================================
+6. USAGE METERING
+==================================================
+
+Create privacy-conscious usage metering.
+
+Track counts such as:
+
+- Active users
+- Active crews
+- Active projects
+- Reports created
+- Reports submitted
+- Reports approved
+- Photos stored
+- Documents stored
+- Form responses
+- Charge-sheet imports
+- Billing rules executed
+- API requests
+- Export jobs
+- Background-processing jobs
+- Storage consumed
+
+Do not include sensitive report contents in usage events.
+
+Do not record:
+
+- Employee wages
+- Customer charge rates
+- Exact report billing totals
+- Private document text
+- Photo content
+- Personal identifiers beyond what is required for tenant administration
+
+==================================================
+7. SUBSCRIPTION STATUS
+==================================================
+
+Create subscription lifecycle states:
+
+- Trial
+- Active
+- Grace period
+- Past due
+- Suspended
+- Cancelled
+- Expired
+
+Support:
+
+- Plan start date
+- Renewal date
+- Billing period
+- Contracted user limit
+- Contracted crew limit
+- Storage limit
+- Trial expiration
+- Grace-period expiration
+- Cancellation date
+- Cancellation reason
+- Reactivation
+
+Do not build fake payment processing.
+
+If no approved payment provider is configured:
+
+- Implement subscription records.
+- Implement manual invoice status.
+- Implement contract-based activation.
+- Clearly label automatic billing as unavailable.
+
+==================================================
+8. FUTURE PAYMENT-PROVIDER ARCHITECTURE
+==================================================
+
+Prepare a secure abstraction for future payment providers.
+
+Support architecture for:
+
+- Customer ID
+- Subscription ID
+- Invoice ID
+- Payment status
+- Payment method status
+- Webhook event ID
+- Idempotency key
+- Sync status
+- Last successful sync
+- Error history
+
+Do not store raw card numbers.
+
+Do not claim payments work unless a real provider is connected and tested.
+
+==================================================
+9. SALES PIPELINE
+==================================================
+
+Create a lightweight internal sales pipeline for Redline platform administrators.
+
+Track:
+
+- Prospect company
+- Contact
+- Company size
+- Number of crews
+- Current software
+- Primary pain point
+- Estimated paperwork hours
+- Estimated billing leakage
+- Interest level
+- Demo date
+- Pilot requested
+- Proposal status
+- Contract status
+- Expected monthly value
+- Sales owner
+- Next action
+- Notes
+
+Statuses:
+
+- New lead
+- Qualified
+- Discovery
+- Demo scheduled
+- Demo completed
+- Pilot proposed
+- Pilot active
+- Proposal sent
+- Contract review
+- Closed won
+- Closed lost
+
+Keep this separate from contractor operational data.
+
+==================================================
+10. ROI CALCULATOR
+==================================================
+
+Create a sales and customer-success ROI calculator.
+
+Inputs:
+
+- Number of foremen
+- Average paperwork hours per foreman per week
+- Estimated hourly labor value
+- Number of reports per week
+- Average correction time
+- Estimated missed billing per week
+- Expected percentage reduction
+- Subscription cost
+- Implementation cost
+
+Outputs:
+
+- Estimated paperwork hours saved
+- Estimated annual time value
+- Estimated billing leakage reduction
+- Estimated total annual value
+- Estimated annual software cost
+- Estimated return on investment
+- Estimated payback period
+
+Clearly label all outputs as estimates.
+
+Never represent potential billing differences as guaranteed recovered revenue.
+
+Allow a tenant to replace estimates with measured pilot results.
+
+==================================================
+11. PILOT-TO-CONTRACT CONVERSION
+==================================================
+
+Expand pilot mode into a formal conversion workflow.
+
+Track:
+
+- Pilot objectives
+- Baseline paperwork time
+- Baseline correction rate
+- Baseline missing billing
+- Pilot start date
+- Pilot end date
+- Pilot crews
+- Pilot projects
+- Pilot users
+- Training completion
+- Usage rate
+- Reports submitted
+- Templates used
+- Confirmed time saved
+- Confirmed billing corrections
+- User feedback
+- Executive review
+- Conversion recommendation
+- Proposed subscription plan
+- Contract decision
+
+Generate a pilot-results summary.
+
+Do not claim success unless supported by measured or confirmed results.
+
+==================================================
+12. IMPLEMENTATION PROJECT MANAGEMENT
+==================================================
+
+Create an implementation workspace for onboarding new tenant companies.
+
+Implementation stages:
+
+1. Contract signed
+2. Kickoff
+3. Data collection
+4. Configuration
+5. Charge-sheet import
+6. Equipment import
+7. Employee import
+8. Work-package setup
+9. Custom-form setup
+10. Permission setup
+11. Integration setup
+12. Training
+13. User acceptance testing
+14. Pilot launch
+15. Production launch
+16. Post-launch review
+
+Each implementation project should include:
+
+- Tenant
+- Implementation owner
+- Tenant project owner
+- Start date
+- Target launch date
+- Status
+- Completion percentage
+- Tasks
+- Dependencies
+- Blockers
+- Documents
+- Meetings
+- Decisions
+- Risks
+- Training sessions
+- Acceptance criteria
+
+==================================================
+13. IMPLEMENTATION TASKS
+==================================================
+
+Allow task assignment to:
+
+- Redline staff
+- Tenant administrator
+- Project manager
+- Billing team
+- IT team
+- Foreman representative
+- Other implementation participants
+
+Each task should support:
+
+- Title
+- Description
+- Owner
+- Due date
+- Priority
+- Status
+- Dependency
+- Attachment
+- Completion notes
+- Approval
+- Audit history
+
+Statuses:
+
+- Not started
+- In progress
+- Blocked
+- Waiting on customer
+- Ready for review
+- Complete
+- Cancelled
+
+==================================================
+14. DATA-IMPORT READINESS
+==================================================
+
+Create an implementation data-import center.
+
+Support importing:
+
+- Users
+- Employees
+- Crews
+- Customers
+- Projects
+- Contracts
+- Labor classifications
+- Equipment
+- Charge sheets
+- Work packages
+- Materials
+- Inventory balances
+- Existing forms
+- Historical reports when explicitly supported
+
+Each import should include:
+
+- Tenant
+- Import type
+- File
+- Column mapping
+- Validation
+- Errors
+- Warnings
+- Duplicate detection
+- Preview
+- Confirmation
+- Result summary
+- Rollback reference
+- Imported by
+- Timestamp
+
+Do not import historical data automatically without confirmation.
+
+==================================================
+15. USER ACCEPTANCE TESTING
+==================================================
+
+Create a UAT system.
+
+Tenant testers should be able to verify workflows such as:
+
+- Sign in
+- Create report
+- Use crew template
+- Add equipment
+- Apply work package
+- Run billing validation
+- Submit report
+- Approve report
+- Create production record
+- Prepare invoice backup
+- Complete custom form
+- Upload photos
+- Work offline
+- Export data
+
+Each UAT case should support:
+
+- Test name
+- Instructions
+- Expected result
+- Actual result
+- Tester
+- Pass or fail
+- Screenshot
+- Notes
+- Defect link
+- Retest status
+- Approval
+
+Do not mark implementation complete until required UAT cases pass or are explicitly waived.
+
+==================================================
+16. CUSTOMER SUCCESS MANAGEMENT
+==================================================
+
+Create a customer-success workspace.
+
+Track:
+
+- Tenant health
+- Adoption
+- Active users
+- Active crews
+- Reports completed
+- Templates used
+- Feature adoption
+- Support cases
+- Training completion
+- Executive reviews
+- Renewal date
+- Risk status
+- Expansion opportunities
+- Customer goals
+- Confirmed business outcomes
+
+Health statuses:
+
+- Healthy
+- Needs attention
+- At risk
+- Implementation
+- Pilot
+- Inactive
+
+Do not infer tenant risk from private employee-level performance.
+
+==================================================
+17. BUSINESS OUTCOME TRACKING
+==================================================
+
+Allow tenants to track confirmed outcomes.
+
+Metrics:
+
+- Average report completion time
+- Reports completed after hours
+- Correction rate
+- Missing documentation rate
+- Billing-warning rate
+- Confirmed billing corrections
+- Approved added billing
+- Average approval time
+- Invoice preparation time
+- Template usage
+- Copy-previous usage
+- User-reported time saved
+- Supervisor-reported quality improvement
+
+Keep separate:
+
+- Potential value
+- Confirmed correction
+- Approved billing
+- User-estimated savings
+- System-estimated savings
+
+==================================================
+18. SUPPORT CASE MANAGEMENT
+==================================================
+
+Create an internal and tenant-facing support system.
+
+Support categories:
+
+- Login issue
+- Permission issue
+- Mobile-layout issue
+- Report issue
+- Billing-rule issue
+- Import issue
+- Export issue
+- Offline sync issue
+- Photo upload issue
+- Integration issue
+- Performance issue
+- Data correction
+- Feature request
+- Security concern
+- Other
+
+Each case should include:
+
+- Tenant
+- Requester
+- Category
+- Severity
+- Priority
+- Description
+- Screenshots
+- Related report
+- Related project
+- Related user
+- Status
+- Assigned support owner
+- Internal notes
+- Customer-visible updates
+- Resolution
+- Created timestamp
+- First-response timestamp
+- Resolved timestamp
+
+==================================================
+19. SUPPORT PRIORITIES AND SLAS
+==================================================
+
+Support priorities:
+
+P1 Critical:
+- System unavailable
+- Security incident
+- Widespread data-access failure
+- Report submission blocked company-wide
+
+P2 High:
+- Major workflow unavailable
+- Billing calculations materially incorrect
+- Multiple users blocked
+
+P3 Normal:
+- Individual workflow issue
+- Import or export issue
+- Mobile problem
+- Configuration assistance
+
+P4 Low:
+- General question
+- Minor visual issue
+- Feature request
+
+Allow configurable SLA targets for:
+
+- Initial response
+- Status update
+- Resolution target
+
+Do not claim contractual SLA compliance unless actual monitoring supports it.
+
+==================================================
+20. IN-APP SUPPORT EXPERIENCE
+==================================================
+
+Allow users to:
+
+- Open a support case
+- Attach screenshots
+- Link the current page
+- Link a report or record
+- View case status
+- Respond to support
+- Close resolved cases
+- Rate the resolution
+
+Automatically include safe diagnostic metadata such as:
+
+- Application version
+- Browser or device type
+- Page
+- Feature module
+- Timestamp
+- Tenant ID
+
+Do not automatically attach private report contents.
+
+==================================================
+21. KNOWLEDGE BASE
+==================================================
+
+Create a searchable help and knowledge base.
+
+Categories:
+
+- Getting started
+- Company setup
+- Foreman workflow
+- Billing setup
+- Templates
+- Custom forms
+- Offline use
+- Scheduling
+- Equipment
+- Inventory
+- Reporting
+- Approvals
+- Customer portal
+- Exports
+- Integrations
+- Security
+- Troubleshooting
+
+Support:
+
+- Draft articles
+- Published articles
+- Tenant-specific articles
+- Role-specific visibility
+- Version history
+- Search
+- Helpful or not helpful feedback
+
+==================================================
+22. RELEASE MANAGEMENT
+==================================================
+
+Create internal release tracking.
+
+Each release should include:
+
+- Version
+- Release name
+- Environment
+- Planned date
+- Actual date
+- Features
+- Fixes
+- Database migrations
+- Configuration changes
+- Known issues
+- Rollback plan
+- Approval
+- Deployment status
+- Verification status
+
+Statuses:
+
+- Planned
+- In development
+- Testing
+- Approved
+- Deploying
+- Released
+- Rolled back
+- Cancelled
+
+Do not perform production deployment automatically.
+
+==================================================
+23. FEATURE FLAGS
+==================================================
+
+Create a feature-flag system.
+
+Flags may be scoped by:
+
+- Environment
+- Tenant
+- Division
+- User role
+- Specific user
+- Subscription plan
+- Pilot group
+- Percentage rollout
+
+Each flag should support:
+
+- Name
+- Description
+- Owner
+- Default state
+- Tenant overrides
+- Start date
+- End date
+- Audit history
+- Emergency disable
+
+Use feature flags for risky or incomplete features.
+
+Do not leave security controls dependent only on client-side feature flags.
+
+==================================================
+24. ENVIRONMENT SEPARATION
+==================================================
+
+Document and enforce separation between:
+
+- Local development
+- Test
+- Staging
+- Production
+
+Requirements:
+
+- Separate databases
+- Separate file storage
+- Separate secrets
+- Separate integration credentials
+- Clear environment indicators
+- No production data in development
+- Safe seed data
+- Migration controls
+- Deployment verification
+
+Never use fictional seed scripts against production.
+
+==================================================
+25. PRODUCTION CONFIGURATION REVIEW
+==================================================
+
+Create a production-readiness checklist covering:
+
+- Authentication
+- Authorization
+- Company isolation
+- Database migrations
+- Backups
+- File storage
+- Secrets
+- Rate limiting
+- Error handling
+- Monitoring
+- Logging
+- Background jobs
+- Email configuration
+- Domain configuration
+- SSL
+- Session security
+- Support contacts
+- Incident response
+- Rollback
+- Data retention
+- Terms and privacy documents
+- Customer support readiness
+
+==================================================
+26. INCIDENT MANAGEMENT
+==================================================
+
+Create an internal incident-management system.
+
+Each incident should support:
+
+- Title
+- Severity
+- Start time
+- Detection time
+- Affected services
+- Affected tenants
+- Current status
+- Incident commander
+- Technical owner
+- Customer-communication owner
+- Timeline
+- Updates
+- Root cause
+- Resolution
+- Corrective actions
+- Post-incident review
+
+Statuses:
+
+- Investigating
+- Identified
+- Monitoring
+- Resolved
+- Closed
+
+Severities:
+
+- SEV-1
+- SEV-2
+- SEV-3
+- SEV-4
+
+==================================================
+27. CUSTOMER INCIDENT COMMUNICATION
+==================================================
+
+Allow authorized Redline staff to publish tenant-safe incident updates.
+
+Updates should include:
+
+- Current status
+- Affected features
+- Workaround
+- Next update time
+- Resolution notice
+
+Do not expose internal security details, other tenant names, or private technical information.
+
+==================================================
+28. SECURITY-INCIDENT WORKFLOW
+==================================================
+
+Create a separate restricted security-incident workflow.
+
+Support:
+
+- Potential unauthorized access
+- Credential exposure
+- Cross-tenant access concern
+- Malicious upload
+- Suspicious API activity
+- Data export concern
+- Lost device
+- Account takeover
+- Integration compromise
+- Other security event
+
+Restrict access to designated security administrators.
+
+Record all response actions.
+
+==================================================
+29. AUDIT-LOG SEARCH
+==================================================
+
+Create powerful audit-log search for authorized roles.
+
+Filter by:
+
+- Tenant
+- User
+- Action
+- Record type
+- Record ID
+- Date range
+- IP or session
+- Division
+- Project
+- Severity
+- Support-access session
+- Export
+- Permission change
+- Billing override
+- Report approval
+
+Protect logs from unauthorized modification.
+
+==================================================
+30. COMPLIANCE READINESS
+==================================================
+
+Prepare the architecture and documentation for common security reviews.
+
+Create documentation and evidence tracking for:
+
+- Access control
+- User provisioning
+- User deactivation
+- Least privilege
+- Password and session security
+- Change management
+- Incident response
+- Backup and recovery
+- Data retention
+- Vendor management
+- Vulnerability management
+- Security training
+- Audit logging
+- Encryption
+- File access
+- Production access
+- Business continuity
+
+Do not claim certification or compliance that has not been independently verified.
+
+==================================================
+31. SECURITY POLICY CENTER
+==================================================
+
+Create internal policy-document tracking.
+
+Policies may include:
+
+- Information security
+- Access control
+- Acceptable use
+- Incident response
+- Data retention
+- Backup and recovery
+- Vulnerability management
+- Change management
+- Vendor management
+- Business continuity
+- Secure development
+- Privacy
+- Employee offboarding
+
+Each policy should support:
+
+- Owner
+- Version
+- Approval
+- Effective date
+- Review date
+- Status
+- Attachment
+- Change history
+
+==================================================
+32. ACCESS REVIEWS
+==================================================
+
+Create periodic tenant and platform access reviews.
+
+Review:
+
+- Active users
+- Inactive users
+- Administrators
+- Billing reviewers
+- Executive access
+- API keys
+- Integration accounts
+- Support access
+- Customer portal users
+- Temporary delegates
+
+Allow reviewers to:
+
+- Confirm access
+- Reduce access
+- Revoke access
+- Request clarification
+- Record review notes
+
+==================================================
+33. API KEY MANAGEMENT
+==================================================
+
+Expand API-key management.
+
+Each key should include:
+
+- Tenant
+- Name
+- Owner
+- Scopes
+- Created date
+- Last used
+- Expiration date
+- Status
+- Allowed IP restrictions when supported
+- Rotation history
+
+Requirements:
+
+- Show the secret only once.
+- Store only secure hashes when appropriate.
+- Allow revocation.
+- Allow rotation.
+- Record usage.
+- Rate limit requests.
+- Audit all changes.
+
+==================================================
+34. DATA-EXPORT REQUESTS
+==================================================
+
+Create a formal tenant data-export workflow.
+
+Exports may include:
+
+- Configuration
+- Users
+- Employees
+- Reports
+- Production
+- Billing
+- Photos index
+- Documents index
+- Audit logs
+- Equipment
+- Inventory
+- Forms
+- Customer portal records
+
+Each request should include:
+
+- Requested by
+- Scope
+- Reason
+- Approval
+- Status
+- File expiration
+- Download count
+- Completion timestamp
+
+Require recent authentication for sensitive exports.
+
+==================================================
+35. TENANT OFFBOARDING
+==================================================
+
+Create a safe tenant offboarding workflow.
+
+Steps:
+
+1. Confirm cancellation.
+2. Confirm contract end date.
+3. Disable new data creation when appropriate.
+4. Complete outstanding exports.
+5. Revoke external integrations.
+6. Revoke API keys.
+7. Disable customer portal access.
+8. Disable ordinary users.
+9. Preserve data according to retention terms.
+10. Schedule deletion only when authorized.
+11. Record final confirmation.
+
+Do not delete tenant data immediately upon cancellation.
+
+==================================================
+36. DATA DELETION WORKFLOW
+==================================================
+
+Create a controlled deletion process.
+
+Requirements:
+
+- Tenant authorization
+- Platform approval
+- Legal or retention review
+- Export confirmation
+- Waiting period
+- Final confirmation
+- Deletion job
+- Verification
+- Audit evidence
+
+Preserve records that must be retained under the configured agreement.
+
+Do not create a one-click irreversible tenant deletion action.
+
+==================================================
+37. PLATFORM ANALYTICS
+==================================================
+
+Create privacy-conscious platform analytics.
+
+Track:
+
+- Active tenants
+- Active users
+- Active crews
+- Reports submitted
+- Template adoption
+- Billing warnings generated
+- Confirmed billing corrections
+- Average report completion time
+- Support case volume
+- Feature adoption
+- Pilot conversion
+- Tenant retention
+- Background-job health
+- Error rates
+
+Do not combine customer financial values into public benchmarks without explicit authorization.
+
+==================================================
+38. BENCHMARKING ARCHITECTURE
+==================================================
+
+Prepare optional anonymized benchmarking.
+
+Potential future metrics:
+
+- Average report completion time
+- Template usage
+- Approval time
+- Correction frequency
+- Documentation completeness
+
+Requirements:
+
+- Explicit tenant opt-in
+- Minimum group size
+- No company identification
+- No employee identification
+- No billing rates
+- No wages
+- No customer names
+- Ability to opt out
+
+Do not activate benchmarking by default.
+
+==================================================
+39. CUSTOMER EXECUTIVE REVIEW
+==================================================
+
+Create quarterly or monthly business-review reports.
+
+Include:
+
+- Adoption
+- Reports completed
+- Time-to-completion trends
+- Template usage
+- Documentation completeness
+- Confirmed billing corrections
+- Support cases
+- Training completion
+- Feature usage
+- Customer goals
+- Next-period priorities
+
+Clearly distinguish estimates from verified outcomes.
+
+==================================================
+40. TRAINING MANAGEMENT
+==================================================
+
+Create a tenant training system.
+
+Training modules may include:
+
+- Foreman basics
+- Starting a report
+- Copying previous work
+- Labor and equipment
+- Work packages
+- Billing warnings
+- Custom forms
+- Photos
+- Offline mode
+- Supervisor approval
+- Billing review
+- Scheduling
+- Fleet
+- Inventory
+- Customer portal
+- Administrator setup
+
+Track:
+
+- Assigned users
+- Completion
+- Quiz result when used
+- Completion date
+- Expiration
+- Refresher requirement
+- Certification
+
+Do not replace legally required safety training systems.
+
+==================================================
+41. ONBOARDING CHECKLIST BY ROLE
+==================================================
+
+Create role-specific onboarding.
+
+Foreman:
+- Join company
+- Confirm crew
+- Complete training
+- Create practice report
+- Use template
+- Submit training report
+
+Supervisor:
+- Review report
+- Return correction
+- Approve production
+- Resolve warning
+
+Billing reviewer:
+- Review charge sheet
+- Review warning
+- Approve billing
+- Prepare export
+
+Administrator:
+- Configure company
+- Import users
+- Import equipment
+- Import rates
+- Create templates
+- Configure permissions
+
+==================================================
+42. PRODUCT FEEDBACK ROADMAP
+==================================================
+
+Connect feedback and support cases to a product roadmap.
+
+Roadmap items should support:
+
+- Title
+- Problem
+- Requested by tenants
+- Number of requests
+- Business impact
+- Security impact
+- Estimated effort
+- Priority
+- Status
+- Target release
+- Owner
+- Notes
+
+Statuses:
+
+- Under review
+- Planned
+- In development
+- Testing
+- Released
+- Declined
+- Deferred
+
+Do not expose one tenant’s private request details to another tenant.
+
+==================================================
+43. PERFORMANCE SERVICE LEVELS
+==================================================
+
+Define and measure internal performance targets for:
+
+- Page load
+- API latency
+- Report save
+- Report submission
+- Photo upload
+- Export generation
+- Background jobs
+- Search
+- Dashboard loading
+- Offline synchronization
+
+Track percentile performance where possible.
+
+Do not claim guaranteed uptime or latency without real monitoring and contractual approval.
+
+==================================================
+44. LOAD TESTING
+==================================================
+
+Create load tests for:
+
+- Concurrent report creation
+- Concurrent report submission
+- Large photo uploads
+- Billing-rule execution
+- Large charge-sheet imports
+- Large exports
+- Dashboard aggregation
+- Scheduling board
+- Inventory transactions
+- API requests
+- Background-job queue
+
+Test realistic scenarios such as:
+
+- 100 concurrent foremen
+- 500 concurrent users
+- Storm-response surge
+- End-of-week report submissions
+- Large invoice-package generation
+
+Do not run dangerous load tests against production.
+
+==================================================
+45. DATA-MIGRATION SAFETY
+==================================================
+
+Improve migration safety.
+
+Requirements:
+
+- Migration dry run
+- Backward compatibility
+- Pre-migration validation
+- Post-migration validation
+- Rollback documentation
+- Large-table strategy
+- Index creation safety
+- Data backfill progress
+- Failure recovery
+- Audit record
+
+Do not combine destructive schema changes with untested releases.
+
+==================================================
+46. AUTOMATED BACKUP VERIFICATION
+==================================================
+
+Build architecture for verifying backups.
+
+Track:
+
+- Database backup status
+- File backup status
+- Backup timestamp
+- Backup size
+- Verification status
+- Restore-test date
+- Restore-test result
+- Retention period
+
+Do not claim backups are working unless verified.
+
+==================================================
+47. PRODUCTION OBSERVABILITY
+==================================================
+
+Create production monitoring dashboards for:
+
+- Uptime
+- API errors
+- Authentication failures
+- Authorization failures
+- Cross-tenant access attempts
+- Background-job failures
+- File-processing failures
+- Export failures
+- Import failures
+- Database latency
+- Storage errors
+- Offline sync errors
+- Integration failures
+
+Do not log sensitive report contents.
+
+==================================================
+48. ALERT ROUTING
+==================================================
+
+Route platform alerts by severity.
+
+Examples:
+
+- Security alert
+- Cross-tenant authorization failure
+- Database unavailable
+- Background queue stopped
+- File storage unavailable
+- Report submissions failing
+- Billing engine failures
+- Integration outage
+- High error rate
+- Storage threshold exceeded
+
+Configure:
+
+- Alert owner
+- Escalation path
+- Acknowledgment
+- Resolution
+- Suppression
+- Maintenance window
+
+Do not build fake external paging if no provider is connected.
+
+==================================================
+49. MOBILE PRODUCTION REVIEW
+==================================================
+
+Audit the entire mobile application before launch.
+
+Prioritize:
+
+- Login
+- Company selection
+- Start today’s work
+- Crew confirmation
+- Equipment selection
+- Work-package selection
+- Labor entry
+- Production entry
+- Photos
+- Custom forms
+- Billing warnings
+- Offline status
+- Submission
+- Correction workflow
+- Support case creation
+
+Requirements:
+
+- No horizontal overflow
+- No hidden action buttons
+- No keyboard-covered inputs
+- Fast loading
+- Clear offline state
+- Large tap targets
+- High contrast
+- Accessible labels
+- Stable navigation
+- Clear errors
+- Safe retry behavior
+
+Test on:
+
+- 320px
+- 375px
+- 390px
+- 430px
+- Tablet
+- Desktop
+
+==================================================
+50. SECURITY PENETRATION TEST PREPARATION
+==================================================
+
+Prepare for an independent security assessment.
+
+Review:
+
+- Authentication
+- Session handling
+- Password reset
+- Multi-factor architecture
+- Tenant isolation
+- Role escalation
+- IDOR risks
+- File access
+- Upload validation
+- API authorization
+- API keys
+- SSO architecture
+- Customer portal links
+- Support impersonation
+- Data exports
+- Audit-log integrity
+- Rate limiting
+- Injection risks
+- Cross-site scripting
+- CSRF when applicable
+- Secret exposure
+- Dependency vulnerabilities
+
+Create a security-testing checklist and remediation tracker.
+
+Do not claim the application passed a penetration test unless an actual qualified assessment occurred.
+
+==================================================
+51. TERMS, PRIVACY, AND CONSENT ARCHITECTURE
+==================================================
+
+Create architecture for versioned legal documents.
+
+Support:
+
+- Terms of service
+- Privacy notice
+- Data-processing terms
+- Acceptable-use policy
+- Cookie notice when applicable
+- Customer portal terms
+- Support-access consent
+- Location collection explanation
+- Signature consent
+
+Track:
+
+- Document version
+- Effective date
+- User acceptance
+- Tenant acceptance
+- Timestamp
+- Source
+
+Do not draft final legal terms as authoritative legal advice.
+
+Use placeholders clearly marked for attorney review.
+
+==================================================
+52. DEMO COMMERCIAL DATA
+==================================================
+
+Create fictional demo data for:
+
+Tenants:
+
+- Prairie Line Contractors
+- Red Rock Utility Services
+- Heartland Storm Response
+
+Plans:
+
+- Pilot
+- Professional
+- Enterprise
+
+Include:
+
+- One implementation project
+- One active pilot
+- One converted customer
+- One tenant needing attention
+- Support cases
+- Feature entitlements
+- Usage records
+- Subscription status
+- UAT cases
+- Training assignments
+- Release record
+- Incident record
+- Data-export request
+- Access review
+
+Clearly label all demo data as fictional.
+
+==================================================
+53. AUTOMATED TESTING
+==================================================
+
+Add tests for:
+
+- Tenant isolation
+- Platform-admin permissions
+- Support-access expiration
+- Support-access auditing
+- Subscription entitlements
+- Usage limits
+- Trial expiration
+- Grace period behavior
+- Feature locking
+- Data preservation after downgrade
+- Pilot conversion
+- ROI calculations
+- Implementation task workflow
+- UAT workflow
+- Support cases
+- SLA calculations
+- Feature flags
+- Environment separation
+- Incident workflow
+- API key rotation
+- Data-export authorization
+- Tenant offboarding
+- Data-deletion approval
+- Access reviews
+- Training completion
+- Release tracking
+- Audit-log search
+- Mobile rendering
+- Load-test configuration
+- Migration safety checks
+
+Edge cases:
+
+- Trial expires while reports remain in draft
+- Tenant exceeds user limit
+- Tenant downgraded with enterprise data
+- Support access expires during troubleshooting
+- Tenant administrator revokes support access
+- Subscription suspended during offline work
+- Data export requested by unauthorized user
+- Cancelled tenant requests reactivation
+- API key used after revocation
+- Feature flag disabled during report creation
+- Migration partially fails
+- Duplicate webhook event
+- Incident affects only one tenant
+- User accepts outdated legal terms
+- Platform administrator attempts unsupported tenant-data access
+
+==================================================
+54. REGRESSION TESTING
+==================================================
+
+Retest all existing Redline systems:
+
+- Authentication
+- Company onboarding
+- Divisions
+- Employees
+- Qualifications
+- Crews
+- Scheduling
+- Work orders
+- Daily reports
+- Labor
+- Equipment
+- Fleet
+- Materials
+- Inventory
+- Charge sheets
+- Billing rules
+- Missing-charge detection
+- Undercharge detection
+- Production
+- Job costing
+- Invoice preparation
+- Change orders
+- T&M tickets
+- Custom forms
+- Photos
+- GPS
+- Signatures
+- Offline sync
+- Customer portal
+- API
+- Exports
+- Permissions
+- Audit logs
+- Mobile layouts
+
+Fix all regressions before completion.
+
+==================================================
+COMPLETION REQUIREMENTS
+==================================================
+
+Do not stop after creating dashboards or mockups.
+
+Deliver working:
+
+- Tenant administration
+- Platform administration
+- Controlled support access
+- Subscription plans
+- Feature entitlements
+- Usage metering
+- Subscription lifecycle
+- Sales pipeline
+- ROI calculator
+- Pilot conversion
+- Implementation management
+- UAT system
+- Customer-success management
+- Business-outcome tracking
+- Support cases
+- SLA tracking
+- Knowledge base
+- Release management
+- Feature flags
+- Incident management
+- Security-incident workflow
+- Compliance-readiness documentation
+- Access reviews
+- API key management
+- Data exports
+- Tenant offboarding
+- Training management
+- Product roadmap
+- Load testing
+- Production observability
+- Security hardening
+- Automated tests
+
+At completion, provide:
+
+1. Features built
+2. Database migrations
+3. Tenant-management architecture
+4. Subscription and entitlement behavior
+5. Pilot-conversion workflow
+6. Implementation workflow
+7. Support-access safeguards
+8. Compliance-readiness work
+9. Production-monitoring architecture
+10. Security improvements
+11. Performance and load testing
+12. Tests completed
+13. Existing bugs fixed
+14. Features still mocked
+15. Paid integrations still requiring approval
+16. Known limitations
+17. Exact production-launch checklist
+18. Recommended next phase
+
+Primary success condition:
+
+Redline should be capable of onboarding, configuring, supporting, measuring, and commercially managing multiple contractor companies without weakening company isolation or requiring developers to manually change the application for every new customer.
