@@ -29,6 +29,7 @@ import CrewsListPage from "@/pages/crews/index";
 import CrewDetailPage from "@/pages/crews/detail";
 import ProjectsListPage from "@/pages/projects/index";
 import SettingsPage from "@/pages/settings";
+import RatesSettingsPage from "@/pages/settings/rates";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useGetMe, useListCompanies, useUpsertMe, getListCompaniesQueryKey } from "@workspace/api-client-react";
@@ -255,6 +256,9 @@ function ClerkProviderWithRoutes() {
         </Route>
         <Route path="/settings">
           {() => <ProtectedRoute component={SettingsPage} />}
+        </Route>
+        <Route path="/settings/rates">
+          {() => <ProtectedRoute component={RatesSettingsPage} />}
         </Route>
       </Switch>
     </ClerkProvider>

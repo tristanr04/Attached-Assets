@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Link, useLocation } from "wouter";
 import { useClerk, useUser } from "@clerk/react";
-import { Home, FileText, Users, HardHat, Settings, LogOut, Loader2, Building, ShieldAlert } from "lucide-react";
+import { Home, FileText, Users, HardHat, Settings, LogOut, Building, ShieldAlert, DollarSign } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useCompanyStore } from "@/hooks/use-company-store";
@@ -65,6 +65,12 @@ export function Sidebar() {
       icon: ShieldAlert,
       roles: ['supervisor', 'admin']
     });
+    navItems.push({
+      title: "Rates & Billing",
+      href: "/settings/rates",
+      icon: DollarSign,
+      roles: ['supervisor', 'admin']
+    });
   }
 
   if (role === 'admin') {
@@ -77,49 +83,84 @@ export function Sidebar() {
   }
 
   return (
-    <div className="flex h-screen w-20 md:w-64 flex-col bg-card border-r shadow-sm">
-      <div className="flex h-16 items-center justify-center md:justify-start md:px-6 border-b border-border">
-        <Link href="/dashboard" className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
-            <HardHat className="h-6 w-6 text-primary-foreground" />
-          </div>
-          <span className="hidden md:block text-xl font-bold uppercase tracking-tight">Foreman AI</span>
-        </Link>
-      </div>
+    <>
+      {/* Desktop Sidebar */}
+      <div className="hidden md:flex h-[100dvh] w-64 flex-col bg-card border-r shadow-sm flex-shrink-0">
+        <div className="flex h-16 items-center justify-start px-6 border-b border-border">
+          <Link href="/dashboard" className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
+              <HardHat className="h-6 w-6 text-primary-foreground" />
+            </div>
+            <span className="text-xl font-bold uppercase tracking-tight">Foreman AI</span>
+          </Link>
+        </div>
 
-      <div className="flex-1 overflow-auto py-6 flex flex-col gap-2 px-3">
-        {navItems.filter(item => item.roles.includes(role)).map((item) => (
-          <Link key={item.href} href={item.href}>
-            <Button
-              variant={location === item.href || (item.href !== '/dashboard' && location.startsWith(item.href)) ? "secondary" : "ghost"}
-              className={cn(
-                "w-full justify-center md:justify-start h-14 md:h-12",
-                location === item.href || (item.href !== '/dashboard' && location.startsWith(item.href)) ? "bg-secondary" : ""
-              )}
-            >
-              <item.icon className="h-6 w-6 md:mr-3 md:h-5 md:w-5" />
-              <span className="hidden md:block font-bold">{item.title}</span>
+        <div className="flex-1 overflow-y-auto py-6 flex flex-col gap-2 px-3">
+          {navItems.filter(item => item.roles.includes(role)).map((item) => (
+            <Link key={item.href} href={item.href}>
+              <Button
+                variant={location === item.href || (item.href !== '/dashboard' && location.startsWith(item.href)) ? "secondary" : "ghost"}
+                className={cn(
+                  "w-full justify-start h-12",
+                  location === item.href || (item.href !== '/dashboard' && location.startsWith(item.href)) ? "bg-secondary" : ""
+                )}
+              >
+                <item.icon className="mr-3 h-5 w-5" />
+                <span className="font-bold">{item.title}</span>
+              </Button>
+            </Link>
+          ))}
+        </div>
+
+        <div className="border-t border-border p-3 flex flex-col gap-2">
+          <Link href="/settings">
+            <Button variant="ghost" className="w-full justify-start h-12">
+              <Settings className="mr-3 h-5 w-5" />
+              <span className="font-bold">Settings</span>
             </Button>
           </Link>
-        ))}
+          <Button 
+            variant="ghost" 
+            className="w-full justify-start h-12 text-muted-foreground hover:text-destructive"
+            onClick={() => signOut({ redirectUrl: basePath || "/" })}
+          >
+            <LogOut className="mr-3 h-5 w-5" />
+            <span className="font-bold">Log out</span>
+          </Button>
+        </div>
       </div>
 
-      <div className="border-t border-border p-3 flex flex-col gap-2">
-        <Link href="/settings">
-          <Button variant="ghost" className="w-full justify-center md:justify-start h-14 md:h-12">
-            <Settings className="h-6 w-6 md:mr-3 md:h-5 md:w-5" />
-            <span className="hidden md:block font-bold">Settings</span>
-          </Button>
-        </Link>
-        <Button 
-          variant="ghost" 
-          className="w-full justify-center md:justify-start h-14 md:h-12 text-muted-foreground hover:text-destructive"
-          onClick={() => signOut({ redirectUrl: basePath || "/" })}
-        >
-          <LogOut className="h-6 w-6 md:mr-3 md:h-5 md:w-5" />
-          <span className="hidden md:block font-bold">Log out</span>
-        </Button>
-      </div>
-    </div>
+      {/* Mobile Bottom Tab Bar */}
+      <nav 
+        className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-card border-t border-border" 
+        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+      >
+        <div className="flex justify-around items-center h-16 px-1">
+          {navItems.filter(item => item.roles.includes(role)).slice(0, 4).map(item => {
+            const isActive = location === item.href || (item.href !== '/dashboard' && location.startsWith(item.href));
+            return (
+              <Link key={item.href} href={item.href} className="flex-1">
+                <div className={cn(
+                  "flex flex-col items-center justify-center w-full h-full py-1 gap-1",
+                  isActive ? "text-primary" : "text-muted-foreground"
+                )}>
+                  <item.icon className={cn("h-6 w-6", isActive ? "fill-primary/20" : "")} />
+                  <span className="text-[10px] font-bold uppercase tracking-wider">{item.title}</span>
+                </div>
+              </Link>
+            )
+          })}
+          <Link href="/settings" className="flex-1">
+            <div className={cn(
+              "flex flex-col items-center justify-center w-full h-full py-1 gap-1",
+              location.startsWith('/settings') ? "text-primary" : "text-muted-foreground"
+            )}>
+              <Settings className={cn("h-6 w-6", location.startsWith('/settings') ? "fill-primary/20" : "")} />
+              <span className="text-[10px] font-bold uppercase tracking-wider">Settings</span>
+            </div>
+          </Link>
+        </div>
+      </nav>
+    </>
   );
 }

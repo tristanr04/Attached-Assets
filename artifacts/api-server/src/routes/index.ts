@@ -8,6 +8,9 @@ import reportsRouter from "./reports";
 import catalogRouter from "./catalog";
 import dictationRouter from "./dictation";
 import dashboardRouter from "./dashboard";
+import laborClassificationsRouter from "./labor-classifications";
+import billableItemsRouter from "./billable-items";
+import reportTemplatesRouter from "./report-templates";
 
 const router: IRouter = Router();
 
@@ -20,5 +23,8 @@ router.use(reportsRouter);
 router.use(catalogRouter);
 router.use(dictationRouter);
 router.use(dashboardRouter);
+router.use(laborClassificationsRouter);
+router.use(billableItemsRouter);
+router.use(reportTemplatesRouter);
 
 export default router;

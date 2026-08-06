@@ -42,7 +42,7 @@ export default function CompanySetupPage() {
   };
 
   return (
-    <div className="min-h-[100dvh] flex items-center justify-center bg-background p-4">
+    <div className="min-h-[100dvh] flex items-center justify-center bg-background p-4" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
       <div className="max-w-md w-full">
         <div className="flex justify-center mb-8">
           <div className="h-16 w-16 rounded-xl bg-primary flex items-center justify-center">

@@ -6,11 +6,12 @@ import {
   useListReportMaterials, getListReportMaterialsQueryKey,
   useListReportEquipment, getListReportEquipmentQueryKey
 } from "@workspace/api-client-react";
-import { Loader2, Printer, Edit2, CheckCircle2, AlertTriangle, Users, Package, Truck, HardHat } from "lucide-react";
+import { Loader2, Printer, Edit2, CheckCircle2, AlertTriangle, Users, Package, Truck, HardHat, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { format } from "date-fns";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 export default function ReportDetailPage({ id }: { id: number }) {
   const { data: report, isLoading: isReportLoading } = useGetReport(id, {
@@ -32,233 +33,172 @@ export default function ReportDetailPage({ id }: { id: number }) {
   const isLoading = isReportLoading || isTimeLoading || isMatLoading || isEqLoading;
 
   if (isLoading) {
-    return (
-      <div className="flex h-[50vh] items-center justify-center">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-      </div>
-    );
+    return <div className="flex h-[50vh] items-center justify-center"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
 
   if (!report) return <div>Report not found</div>;
 
   return (
-    <div className="space-y-8 pb-20">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <div className="flex items-center gap-3 mb-2">
-            <h1 className="text-4xl font-extrabold tracking-tight uppercase">Daily Report</h1>
-            <Badge variant={report.status === 'complete' ? 'complete' : 'draft'} className="text-sm">
-              {report.status}
-            </Badge>
-          </div>
-          <p className="text-muted-foreground font-medium text-lg">
-            {format(new Date(report.reportDate), 'EEEE, MMMM do, yyyy')}
-          </p>
+    <div className="pb-24 md:pb-8 space-y-4 md:space-y-8">
+      <div className="flex flex-col justify-start gap-2 mb-2">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl md:text-4xl font-extrabold tracking-tight uppercase">Daily Report</h1>
+          <Badge variant={report.status === 'complete' ? 'complete' : 'draft'} className="text-xs uppercase tracking-wider px-2 py-1">
+            {report.status}
+          </Badge>
         </div>
-        <div className="flex gap-3">
-          <Link href={`/reports/${id}/print`}>
-            <Button variant="outline" className="font-bold gap-2">
-              <Printer className="h-4 w-4" /> Print PDF
-            </Button>
+        <p className="text-muted-foreground font-bold text-base md:text-lg">
+          {format(new Date(report.reportDate), 'MMM do, yyyy')}
+        </p>
+      </div>
+
+      <div className="hidden md:flex gap-3 mb-6">
+        <Link href={`/reports/${id}/print`}>
+          <Button variant="outline" className="font-bold gap-2"><Printer className="h-4 w-4" /> Print</Button>
+        </Link>
+        {report.status === 'draft' && (
+          <Link href={`/reports/${id}/edit`}>
+            <Button className="font-bold gap-2"><Edit2 className="h-4 w-4" /> Edit Draft</Button>
           </Link>
-          {report.status === 'draft' && (
-            <Link href={`/reports/${id}/edit`}>
-              <Button className="font-bold gap-2">
-                <Edit2 className="h-4 w-4" /> Edit Draft
-              </Button>
-            </Link>
-          )}
-        </div>
+        )}
       </div>
 
-      <div className="grid md:grid-cols-3 gap-6">
-        <Card className="border-border shadow-md">
-          <CardHeader>
-            <CardTitle className="uppercase tracking-wide font-bold">General Info</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <dl className="space-y-4">
-              <div>
-                <dt className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Project</dt>
-                <dd className="font-semibold text-lg flex items-center gap-2 mt-1">
-                  <HardHat className="h-4 w-4 text-primary" />
-                  {report.projectName || 'Not specified'}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Crew</dt>
-                <dd className="font-semibold text-lg flex items-center gap-2 mt-1">
-                  <Users className="h-4 w-4 text-primary" />
-                  {report.crewName || 'Not specified'}
-                </dd>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <dt className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Foreman</dt>
-                  <dd className="font-semibold">{report.foremanName || '-'}</dd>
-                </div>
-                <div>
-                  <dt className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Location</dt>
-                  <dd className="font-semibold">{report.workLocation || '-'}</dd>
-                </div>
-              </div>
-            </dl>
-          </CardContent>
-        </Card>
-
-        <Card className="md:col-span-2 border-border shadow-md">
-          <CardHeader>
-            <CardTitle className="uppercase tracking-wide font-bold">Work Summary</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-6">
-              <div>
-                <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">Description</h4>
-                <p className="text-base font-medium whitespace-pre-wrap">{report.workPerformed || 'No work description provided.'}</p>
-              </div>
-              <div className="grid grid-cols-2 gap-4 pt-4 border-t border-border">
-                <div className="flex items-center gap-3">
-                  {report.safetyMeeting ? (
-                    <CheckCircle2 className="h-6 w-6 text-green-500" />
-                  ) : (
-                    <AlertTriangle className="h-6 w-6 text-yellow-500" />
-                  )}
-                  <span className="font-bold">Safety Meeting {report.safetyMeeting ? 'Held' : 'Not Held'}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  {report.injuries ? (
-                    <AlertTriangle className="h-6 w-6 text-destructive" />
-                  ) : (
-                    <CheckCircle2 className="h-6 w-6 text-green-500" />
-                  )}
-                  <span className={`font-bold ${report.injuries ? 'text-destructive' : ''}`}>
-                    {report.injuries ? 'Injuries Occurred' : 'No Injuries'}
-                  </span>
-                </div>
-              </div>
-              {(report.delays || report.safetyNotes || report.injuryDetails) && (
-                <div className="bg-secondary/30 p-4 rounded-xl space-y-4">
-                  {report.delays && (
-                    <div>
-                      <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Delays</h4>
-                      <p className="font-medium text-sm mt-1">{report.delays}</p>
-                    </div>
-                  )}
-                  {report.injuryDetails && (
-                    <div>
-                      <h4 className="text-xs font-bold uppercase tracking-widest text-destructive">Injury Details</h4>
-                      <p className="font-medium text-sm mt-1 text-destructive">{report.injuryDetails}</p>
-                    </div>
-                  )}
-                </div>
-              )}
+      <Collapsible defaultOpen className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
+        <CollapsibleTrigger className="w-full flex items-center justify-between p-4 md:p-6 bg-secondary/20 hover:bg-secondary/40 font-bold uppercase tracking-widest text-sm">
+          <div className="flex items-center gap-2"><HardHat className="w-5 h-5 text-primary"/> General Info</div>
+          <ChevronDown className="w-5 h-5 text-muted-foreground" />
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="p-4 md:p-6 border-t border-border grid grid-cols-2 gap-y-4 gap-x-6">
+            <div className="col-span-2">
+              <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Project</div>
+              <div className="font-bold text-lg">{report.projectName || 'Not specified'}</div>
             </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="space-y-6">
-        <h2 className="text-2xl font-bold uppercase tracking-tight flex items-center gap-2">
-          <Users className="h-6 w-6" /> Labor Hours
-        </h2>
-        <div className="border border-border rounded-xl overflow-hidden bg-card shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-muted text-muted-foreground uppercase font-bold text-xs">
-                <tr>
-                  <th className="px-4 py-3">Employee</th>
-                  <th className="px-4 py-3">Trade</th>
-                  <th className="px-4 py-3 text-right">Reg</th>
-                  <th className="px-4 py-3 text-right">OT</th>
-                  <th className="px-4 py-3 text-right">DT</th>
-                </tr>
-              </thead>
-              <tbody>
-                {timeEntries.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground italic">No hours logged.</td>
-                  </tr>
-                ) : (
-                  timeEntries.map(entry => (
-                    <tr key={entry.id} className="border-t border-border">
-                      <td className="px-4 py-3 font-semibold">{entry.employeeName}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{entry.trade}</td>
-                      <td className="px-4 py-3 text-right font-mono">{entry.regularHours}</td>
-                      <td className="px-4 py-3 text-right font-mono">{entry.overtimeHours || 0}</td>
-                      <td className="px-4 py-3 text-right font-mono">{entry.doubleTimeHours || 0}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+            <div className="col-span-2 md:col-span-1">
+              <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Crew</div>
+              <div className="font-bold">{report.crewName || 'Not specified'}</div>
+            </div>
+            <div className="col-span-2 md:col-span-1">
+              <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Foreman</div>
+              <div className="font-bold">{report.foremanName || '-'}</div>
+            </div>
+            <div className="col-span-2">
+              <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Description</div>
+              <div className="font-medium text-sm md:text-base whitespace-pre-wrap bg-secondary/20 p-3 rounded">{report.workPerformed || 'No description'}</div>
+            </div>
+            <div className="col-span-2 flex flex-col md:flex-row gap-4 pt-4 border-t border-border">
+              <div className="flex items-center gap-2">
+                {report.safetyMeeting ? <CheckCircle2 className="w-5 h-5 text-green-500" /> : <AlertTriangle className="w-5 h-5 text-yellow-500" />}
+                <span className="font-bold text-sm">Safety Meeting {report.safetyMeeting ? 'Held' : 'Not Held'}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {report.injuries ? <AlertTriangle className="w-5 h-5 text-destructive" /> : <CheckCircle2 className="w-5 h-5 text-green-500" />}
+                <span className={`font-bold text-sm ${report.injuries ? 'text-destructive' : ''}`}>{report.injuries ? 'Injuries Occurred' : 'No Injuries'}</span>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        </CollapsibleContent>
+      </Collapsible>
 
-      <div className="grid md:grid-cols-2 gap-8">
-        <div className="space-y-6">
-          <h2 className="text-xl font-bold uppercase tracking-tight flex items-center gap-2">
-            <Package className="h-5 w-5" /> Materials
-          </h2>
-          <div className="border border-border rounded-xl overflow-hidden bg-card shadow-sm">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-muted text-muted-foreground uppercase font-bold text-xs">
-                <tr>
-                  <th className="px-4 py-3">Item</th>
-                  <th className="px-4 py-3 text-right">Qty</th>
-                  <th className="px-4 py-3">Unit</th>
-                </tr>
-              </thead>
-              <tbody>
-                {materials.length === 0 ? (
-                  <tr>
-                    <td colSpan={3} className="px-4 py-6 text-center text-muted-foreground italic">No materials.</td>
-                  </tr>
-                ) : (
-                  materials.map(item => (
-                    <tr key={item.id} className="border-t border-border">
-                      <td className="px-4 py-3 font-semibold">{item.name}</td>
-                      <td className="px-4 py-3 text-right font-mono">{item.quantity}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{item.unit}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+      <Collapsible defaultOpen className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
+        <CollapsibleTrigger className="w-full flex items-center justify-between p-4 md:p-6 bg-secondary/20 hover:bg-secondary/40 font-bold uppercase tracking-widest text-sm">
+          <div className="flex items-center gap-2"><Users className="w-5 h-5 text-primary"/> Labor Hours <Badge variant="secondary" className="ml-2">{timeEntries.length}</Badge></div>
+          <ChevronDown className="w-5 h-5 text-muted-foreground" />
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="p-2 md:p-4 border-t border-border">
+            {timeEntries.length === 0 ? (
+              <div className="text-center py-6 text-muted-foreground font-medium">No hours logged.</div>
+            ) : (
+              <div className="space-y-2">
+                {timeEntries.map(entry => (
+                  <div key={entry.id} className="bg-background border border-border p-3 rounded-lg flex justify-between items-center">
+                    <div>
+                      <div className="font-bold">{entry.employeeName}</div>
+                      <div className="text-xs text-muted-foreground uppercase font-bold tracking-wider">{entry.trade}</div>
+                    </div>
+                    <div className="flex gap-4 text-center">
+                      <div>
+                        <div className="text-[10px] text-muted-foreground font-bold uppercase">Reg</div>
+                        <div className="font-mono font-bold">{entry.regularHours}</div>
+                      </div>
+                      {(entry.overtimeHours || 0) > 0 && (
+                        <div>
+                          <div className="text-[10px] text-muted-foreground font-bold uppercase">OT</div>
+                          <div className="font-mono font-bold">{entry.overtimeHours}</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        </div>
+        </CollapsibleContent>
+      </Collapsible>
 
-        <div className="space-y-6">
-          <h2 className="text-xl font-bold uppercase tracking-tight flex items-center gap-2">
-            <Truck className="h-5 w-5" /> Equipment
-          </h2>
-          <div className="border border-border rounded-xl overflow-hidden bg-card shadow-sm">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-muted text-muted-foreground uppercase font-bold text-xs">
-                <tr>
-                  <th className="px-4 py-3">Equipment</th>
-                  <th className="px-4 py-3">Unit ID</th>
-                  <th className="px-4 py-3 text-right">Hours</th>
-                </tr>
-              </thead>
-              <tbody>
-                {equipment.length === 0 ? (
-                  <tr>
-                    <td colSpan={3} className="px-4 py-6 text-center text-muted-foreground italic">No equipment.</td>
-                  </tr>
-                ) : (
-                  equipment.map(item => (
-                    <tr key={item.id} className="border-t border-border">
-                      <td className="px-4 py-3 font-semibold">{item.name}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{item.unitId || '-'}</td>
-                      <td className="px-4 py-3 text-right font-mono">{item.hoursUsed}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+      <Collapsible defaultOpen className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
+        <CollapsibleTrigger className="w-full flex items-center justify-between p-4 md:p-6 bg-secondary/20 hover:bg-secondary/40 font-bold uppercase tracking-widest text-sm">
+          <div className="flex items-center gap-2"><Truck className="w-5 h-5 text-primary"/> Equipment <Badge variant="secondary" className="ml-2">{equipment.length}</Badge></div>
+          <ChevronDown className="w-5 h-5 text-muted-foreground" />
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="p-2 md:p-4 border-t border-border">
+            {equipment.length === 0 ? (
+              <div className="text-center py-6 text-muted-foreground font-medium">No equipment logged.</div>
+            ) : (
+              <div className="space-y-2">
+                {equipment.map(item => (
+                  <div key={item.id} className="bg-background border border-border p-3 rounded-lg flex justify-between items-center">
+                    <div>
+                      <div className="font-bold">{item.name}</div>
+                      {item.unitId && <div className="text-xs text-muted-foreground font-mono">{item.unitId}</div>}
+                    </div>
+                    <div className="text-center bg-secondary/30 px-3 py-1 rounded">
+                      <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Hours</div>
+                      <div className="font-mono font-bold">{item.hoursUsed}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        </div>
+        </CollapsibleContent>
+      </Collapsible>
+
+      <Collapsible className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
+        <CollapsibleTrigger className="w-full flex items-center justify-between p-4 md:p-6 bg-secondary/20 hover:bg-secondary/40 font-bold uppercase tracking-widest text-sm">
+          <div className="flex items-center gap-2"><Package className="w-5 h-5 text-primary"/> Materials <Badge variant="secondary" className="ml-2">{materials.length}</Badge></div>
+          <ChevronDown className="w-5 h-5 text-muted-foreground" />
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="p-2 md:p-4 border-t border-border">
+            {materials.length === 0 ? (
+              <div className="text-center py-6 text-muted-foreground font-medium">No materials logged.</div>
+            ) : (
+              <div className="space-y-2">
+                {materials.map(item => (
+                  <div key={item.id} className="bg-background border border-border p-3 rounded-lg flex justify-between items-center">
+                    <div className="font-bold">{item.name}</div>
+                    <div className="font-mono font-bold">{item.quantity} <span className="text-muted-foreground text-sm ml-1">{item.unit}</span></div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+
+      {/* Sticky Bottom Actions on Mobile */}
+      <div className="fixed bottom-[80px] left-0 right-0 p-4 bg-background/90 backdrop-blur-md border-t border-border z-10 md:hidden flex gap-3">
+        <Link href={`/reports/${id}/print`} className="flex-1">
+          <Button variant="outline" className="w-full h-14 font-bold uppercase tracking-wider"><Printer className="w-5 h-5 mr-2" /> Print</Button>
+        </Link>
+        {report.status === 'draft' && (
+          <Link href={`/reports/${id}/edit`} className="flex-1">
+            <Button className="w-full h-14 font-bold uppercase tracking-wider"><Edit2 className="w-5 h-5 mr-2" /> Edit</Button>
+          </Link>
+        )}
       </div>
     </div>
   );

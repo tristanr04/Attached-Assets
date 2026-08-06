@@ -1,0 +1,363 @@
+PHASE: Mobile Layout Fixes, Billable Labor, Equipment Charges, and Reusable Crew Templates
+
+Objective:
+
+Fix the current mobile usability problems and build a complete billable labor and equipment system.
+
+The app must allow companies to configure their own labor classifications, equipment, rates, billing codes, and reusable crew setups. Foremen should be able to select people and equipment quickly instead of entering the same information every day.
+
+Do not remove or break existing authentication, company setup, crew management, projects, reports, database records, or role permissions.
+
+Before changing code:
+
+1. Inspect the current application structure.
+2. Review the current database schema.
+3. Identify the onboarding and mobile layout problems.
+4. Reuse existing models and components where appropriate.
+5. Create database migrations instead of resetting or deleting existing data.
+
+## 1. Fix the Mobile Layout Across the Entire App
+
+The current interface does not fit smaller phone screens correctly.
+
+Audit every page and fix all mobile responsiveness issues.
+
+Requirements:
+
+- No horizontal scrolling.
+- No content wider than the viewport.
+- Forms must fit properly on iPhone and Android screens.
+- Cards must shrink and stack vertically.
+- Buttons must remain fully visible.
+- Inputs must not extend beyond the screen.
+- Tables must convert into mobile-friendly cards or stacked rows.
+- Modals must fit inside the viewport.
+- Navigation must remain usable on small screens.
+- Respect device safe areas, including notches and the bottom home indicator.
+- Account for the mobile keyboard opening.
+- Do not allow fixed elements to cover inputs or buttons.
+- Use large tap targets appropriate for gloved or outdoor use.
+- Keep text readable without requiring zoom.
+- Avoid excessive empty space.
+- Keep the most important actions visible near the top.
+
+Test at minimum:
+
+- 320px width
+- 375px width
+- 390px width
+- 430px width
+- Tablet width
+- Desktop width
+
+Specifically review and fix:
+
+- Create Company page
+- Login and registration
+- Dashboard
+- Crew setup
+- Project setup
+- Daily report forms
+- Equipment selection
+- Labor entry
+- Review and submission pages
+- Admin settings
+
+## 2. Create a Company-Specific Billable Item System
+
+Create a flexible billable-item catalog that belongs to each company.
+
+A company administrator must be able to create and manage its own billing structure.
+
+Billable item categories must include:
+
+- Labor
+- Equipment
+- Materials
+- Work units
+- Add-on charges
+- Custom categories
+
+Each billable item should support:
+
+- Company ID
+- Category
+- Item name
+- Description
+- Billing code
+- Internal code
+- Customer or contract
+- Unit type
+- Base rate
+- Overtime rate
+- Double-time rate
+- Emergency rate
+- Storm rate
+- Quantity
+- Default quantity
+- Taxable status if needed
+- Active or inactive status
+- Effective date
+- Expiration date
+- Notes
+- Created by
+- Created timestamp
+- Updated timestamp
+
+Rates and codes must remain private to the company that created them.
+
+Do not hard-code one company’s rates into the application.
+
+## 3. Labor Classification and Charge System
+
+Create configurable labor classifications such as:
+
+- General foreman
+- Foreman
+- Journeyman lineman
+- Apprentice lineman
+- Operator
+- Groundman
+- Truck driver
+- Safety representative
+- Inspector
+- Other custom role
+
+Each labor classification should support:
+
+- Classification name
+- Billing code
+- Base hourly rate
+- Overtime rate
+- Double-time rate
+- Storm rate
+- Emergency rate
+- Per diem rate
+- Travel rate
+- Minimum billable hours
+- Customer-specific override
+- Active status
+
+Allow administrators to configure different rates for different contracts or customers.
+
+Example:
+
+A journeyman lineman may have one charge rate for Utility A and a different rate for Utility B.
+
+## 4. Daily Labor Entry
+
+On a daily report, allow the foreman to add multiple workers.
+
+Each labor entry should support:
+
+- Employee
+- Classification
+- Regular hours
+- Overtime hours
+- Double-time hours
+- Storm hours
+- Travel hours
+- Per diem days
+- Other billable labor
+- Notes
+- Billing code
+- Calculated charge
+
+The app should automatically calculate the charge using the company’s configured rates.
+
+The foreman must be able to edit hours but should not need to manually enter the rate every day.
+
+Display a clear breakdown:
+
+- Regular labor charge
+- Overtime labor charge
+- Double-time labor charge
+- Per diem
+- Other labor charges
+- Total labor charge
+
+Do not expose employee pay rates unless the company administrator explicitly configures and permits that data.
+
+Billing charge rates and employee wages must be treated as separate concepts.
+
+## 5. Equipment Catalog
+
+Create a configurable equipment catalog.
+
+Include example equipment types for demo data only:
+
+- Bucket truck
+- Digger derrick
+- Backyard machine
+- Mini excavator
+- Skid steer
+- Trencher
+- Crane
+- Pressure digger
+- Pole trailer
+- Material trailer
+- Wire trailer
+- Reel trailer
+- Reel stand
+- Tensioner
+- Puller
+- Pickup truck
+- Service truck
+- UTV
+- ATV
+- Generator
+- Light tower
+- Compressor
+- Traffic-control vehicle
+- Specialty equipment
+- Other custom equipment
+
+Each equipment record should support:
+
+- Company ID
+- Equipment name
+- Equipment type
+- Unit number
+- Description
+- Billing code
+- Hourly rate
+- Daily rate
+- Weekly rate
+- Standby rate
+- Overtime rate
+- Storm rate
+- Emergency rate
+- Mobilization charge
+- Demobilization charge
+- Minimum billable hours
+- Customer-specific rate override
+- Active or inactive status
+- Notes
+
+## 6. Multiple Equipment Charges Per Report
+
+Allow the foreman to add multiple pieces of equipment to one daily report.
+
+Each report equipment entry should support:
+
+- Equipment selected
+- Quantity
+- Hours used
+- Days used
+- Standby hours
+- Mobilization
+- Demobilization
+- Overtime usage
+- Storm usage
+- Emergency usage
+- Billing code
+- Notes
+- Calculated charge
+
+The app must calculate the equipment total automatically based on the company’s configured billing rules.
+
+Display separate totals for:
+
+- Active equipment charges
+- Standby charges
+- Mobilization charges
+- Demobilization charges
+- Specialty charges
+- Total equipment charge
+
+## 7. Quick-Select Equipment Interface
+
+Foremen must not have to search the full catalog every day.
+
+Build a fast equipment selection experience with:
+
+- Search
+- Category filters
+- Recent equipment
+- Crew favorites
+- Project favorites
+- Frequently used equipment
+- “Use yesterday’s equipment”
+- “Use crew default equipment”
+- Multi-select checkboxes or large tap cards
+- Quantity and hours controls
+- Quick removal
+- Custom one-time equipment entry
+
+The interface must work well on a phone.
+
+Example:
+
+A foreman should be able to select:
+
+- Bucket Truck 12
+- Digger Derrick 7
+- Backyard Machine 2
+
+and apply them to the report in a few taps.
+
+## 8. Saved Crew and Equipment Templates
+
+Create reusable operating templates.
+
+Allow users to save:
+
+- Crew members
+- Labor classifications
+- Default equipment
+- Default trucks
+- Default project
+- Default customer
+- Standard work package
+- Default billable items
+
+Examples:
+
+- Crew 17 Standard Setup
+- Storm Crew Setup
+- Pole-Change Crew
+- Underground Crew
+- Transmission Crew
+- Backyard Access Crew
+
+When starting a daily report, allow the foreman to choose:
+
+- Start blank
+- Use crew defaults
+- Copy yesterday
+- Copy previous report
+- Use saved template
+
+The copied report must create a new independent record and must not modify the original report.
+
+## 9. Billable Work Package Templates
+
+Create reusable work-package templates.
+
+Examples:
+
+- 45-foot Class 3 pole replacement
+- 50-foot Class 2 pole replacement
+- Transformer changeout
+- Single-phase service transfer
+- Three-phase bank replacement
+- Anchor installation
+- Guy installation
+- Storm restoration
+- New construction
+- Reconductoring
+
+Each work-package template may contain:
+
+- Default labor classifications
+- Default labor quantities
+- Standard equipment
+- Standard materials
+- Billing codes
+- Base work charges
+- Required add-on items
+- Required documentation
+- Safety checklist
+- Default notes
+
+When a template is selected, automatically add the configured labor,
