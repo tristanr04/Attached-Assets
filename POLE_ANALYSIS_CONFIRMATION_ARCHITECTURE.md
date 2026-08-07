@@ -15,11 +15,22 @@ Pole analysis produces a versioned, company-scoped **AI proposal**. It never wri
 7. In one transaction, verify the report is still draft, the company/report/photo still match, the analysis version is current, and the idempotency key has not been used. Persist the decisions, final confirmed facts, actor, timestamp, and immutable audit record.
 8. Company rules may then create separate reviewable billing suggestions. They may not modify the confirmed visual facts or finalize billing.
 
+## Pole Identity Engine
+
+Each company owns verified pole profiles containing the stable pole asset ID, pole number/tags, coordinates, project/work-order links, visible framing/equipment/attachment/landmark attributes, and foreman-verified reference photos. Retrieval must filter by company before scoring.
+
+The identity engine ranks candidates from four independently recorded signals: normalized OCR/barcode tags, GPS distance, similarity to current verified photos and visible attributes, and active job context. Stale reference photos are discounted. An exact pole is only an **AI-proposed exact match** when the weighted score is at least 0.82, at least two strong independent signals agree, and the lead over the runner-up is at least 0.12. Confirmation remains mandatory even then.
+
+If those gates fail, the engine returns at most three company-scoped candidates and requests the missing evidence: a close pole-tag photo, location-enabled full-pole photo, second equipment/framing angle, or wider landmark view. It never converts uncertainty into an exact asset ID. Exact image hashes identify duplicate uploads, while re-analysis and confirmation still use version and idempotency protections.
+
 ## Persistence needed before live rollout
 
 - `pole_analysis_runs`: company, report, photo, version, target-match status/evidence, raw result, model/prompt versions, state, timestamps.
 - `pole_analysis_fields`: run, field key/value, confidence, evidence, review requirement, requested photo.
 - `pole_analysis_decisions`: run/version, field, accept/edit/reject, original and final values, note, actor, timestamp.
+- `pole_profiles`: company, pole asset ID/number, coordinates, verified tags, project/work-order links, visible attributes, version, timestamps.
+- `pole_reference_photos`: profile, private photo, image hash, verified actor/time, optional provider-neutral visual fingerprint reference.
+- `pole_identity_candidates`: analysis run, profile, total score, per-signal score/evidence, ranking, duplicate-photo evidence.
 - Unique `(photo_id, version)` and idempotency receipt constraints.
 - Row-level authorization through report company and foreman ownership; completed-report mutation guard.
 
@@ -27,4 +38,4 @@ Migrations must be additive, preserve existing reports/photos, support repeat-sa
 
 ## Current checkpoint
 
-The executable contract and fictional fixture tests define field allowlists, evidence/confidence requirements, cross-company/report/photo rejection, ambiguous-target blocking, completed-report locking, decision completeness, stale-version rejection, immutable confirmation output, and field-level scoring. Database persistence, worker/provider calls, report autofill UI, authenticated mobile rendering, and real-device photo behavior remain unimplemented and must not be represented as live.
+The executable contracts and fictional fixture tests define field allowlists, evidence/confidence requirements, cross-company/report/photo rejection, conservative multi-signal pole ranking, adjacent-lookalike ambiguity, specific additional-photo requests, stale-reference discounting, duplicate-photo detection, completed-report locking, decision completeness, stale-version rejection, immutable confirmation output, and field-level scoring. Database persistence, OCR/barcode and visual-fingerprint providers, verified-profile maintenance, worker calls, report autofill UI, authenticated mobile rendering, and real-device photo behavior remain unimplemented and must not be represented as live.
