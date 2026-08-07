@@ -27,6 +27,7 @@ import {
   parseBillableCategory,
   parseOptionalDate,
 } from "../lib/billableItemInput";
+import { normalizeLaborClassificationNumbers } from "../lib/laborClassificationInput";
 
 test("parsePositiveId accepts only canonical positive integer strings", () => {
   assert.equal(parsePositiveId("1"), 1);
@@ -116,6 +117,83 @@ test("billable item routes fail closed on IDs and protected billing inputs", asy
   assert.match(source, /typeof req\.body\.taxable !== "boolean"/);
   assert.match(source, /typeof req\.body\[f\] !== "boolean"/);
   assert.equal(source.match(/expirationDate must not precede effectiveDate/g)?.length, 2);
+});
+
+test("project and catalog routes constrain company reads and reject ambiguous identifiers", async () => {
+  const projects = await readFile(
+    new URL("../routes/projects.ts", import.meta.url),
+    "utf8",
+  );
+  const catalog = await readFile(
+    new URL("../routes/catalog.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.doesNotMatch(projects, /parseInt\(/);
+  assert.doesNotMatch(catalog, /parseInt\(/);
+  assert.match(projects, /inArray\(projectsTable\.companyId, ids\)/);
+  assert.doesNotMatch(projects, /db\.select\(\)\.from\(projectsTable\)\)\.filter/);
+  assert.equal(projects.match(/parsePositiveId\(req\.params\.projectId\)/g)?.length, 2);
+  assert.equal(catalog.match(/parsePositiveId\(req\.query\.companyId\)/g)?.length, 2);
+  assert.equal(catalog.match(/parsePositiveId\(req\.body\?\.companyId\)/g)?.length, 2);
+});
+
+test("project and catalog inputs are bounded and project status is allowlisted", async () => {
+  const projects = await readFile(
+    new URL("../routes/projects.ts", import.meta.url),
+    "utf8",
+  );
+  const catalog = await readFile(
+    new URL("../routes/catalog.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(projects, /\["active", "inactive", "complete"\]\.includes\(req\.body\.status\)/);
+  assert.match(projects, /No valid project fields supplied/);
+  assert.equal(projects.match(/parseRequiredText\(/g)?.length, 2);
+  assert.equal(catalog.match(/parseRequiredText\(/g)?.length, 3);
+  assert.match(catalog, /parseOptionalText\(req\.body\?\.type, 200\)/);
+  assert.equal(catalog.match(/\["admin", "supervisor"\]\.includes\(m\.role\)/g)?.length, 2);
+});
+
+test("labor classification rates enforce database precision and safe numeric values", () => {
+  assert.deepEqual(normalizeLaborClassificationNumbers({
+    baseRate: "125.50",
+    overtimeRate: 188.25,
+    minimumBillableHours: "4.00",
+  }), {
+    ok: true,
+    values: {
+      baseRate: "125.50",
+      overtimeRate: "188.25",
+      minimumBillableHours: "4.00",
+    },
+  });
+
+  for (const [field, value] of [
+    ["baseRate", -1],
+    ["baseRate", "1.001"],
+    ["stormRate", Number.NaN],
+    ["doubleTimeRate", "100000000"],
+    ["minimumBillableHours", "1.001"],
+    ["minimumBillableHours", "1000"],
+  ] as const) {
+    assert.deepEqual(normalizeLaborClassificationNumbers({ [field]: value }), { ok: false, field });
+  }
+});
+
+test("labor classification routes reject malformed IDs, text, flags, and empty patches", async () => {
+  const source = await readFile(
+    new URL("../routes/labor-classifications.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.doesNotMatch(source, /parseInt\(/);
+  assert.match(source, /parsePositiveId\(req\.query\.companyId\)/);
+  assert.equal(source.match(/parsePositiveId\(req\.params\.id\)/g)?.length, 2);
+  assert.equal(source.match(/normalizeLaborClassificationNumbers\(req\.body\)/g)?.length, 2);
+  assert.equal(source.match(/typeof req\.body\.active !== "boolean"/g)?.length, 2);
+  assert.match(source, /No valid labor classification fields supplied/);
 });
 
 test("templates and work packages cannot be applied across companies", async () => {
