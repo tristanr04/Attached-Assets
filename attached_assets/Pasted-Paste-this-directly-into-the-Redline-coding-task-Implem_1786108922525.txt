@@ -1,0 +1,141 @@
+Paste this directly into the Redline coding task:
+
+Implement a production-ready Photo-to-Job Pole Filler in tristanr04/Attached-Assets (Redline). This is now the highest-priority foreman workflow.
+
+Core requirement
+
+The first thing a foreman sees after opening Redline must be the photo filler.
+
+* Place a large, full-width Take Pole Photo button at the top of the foreman home screen, visible without scrolling.
+* One tap must open the rear camera.
+* Place Upload Existing Photo directly beneath it.
+* Do not hide this feature inside a menu, report, tab, small icon, or multi-step workflow.
+* Recent jobs and other actions should appear below the photo controls.
+* Design for one-handed use at 320px, 375px, 390px, and 430px widths.
+
+Required workflow
+
+1. The foreman takes or uploads a pole photo.
+2. Save the original photo securely before analysis so it cannot be lost.
+3. Use the foreman’s company, assignments, active work, schedule, GPS, photo timestamp, mapped location, and OCR pole number/tag to find the correct job.
+4. If there is one reliable match, preselect it as Suggested Job.
+5. If the match is uncertain, show up to three likely company-scoped jobs for one-tap selection.
+6. Never silently attach a photo to the wrong job or another company.
+7. Analyze the photo and automatically populate the selected job/report with clearly marked AI-Proposed Draft values.
+8. Open a review screen showing the photo beside the populated fields.
+9. Require the foreman to accept, edit, or reject material proposals.
+10. Require an explicit Confirm Pole Analysis action before the information becomes confirmed job data.
+11. Do not allow analysis-generated information to be submitted, approved, completed, or billed before foreman confirmation.
+
+Specific pole analysis
+
+Return structured fields rather than a generic description:
+
+* Pole number/tag and OCR text
+* GPS, mapped location, and photo time
+* Pole material, class, height, and visible condition observations
+* Structure, framing, and configuration
+* Circuit, voltage, and phase only when reliably supported
+* Conductors and neutral arrangement
+* Crossarms and braces
+* Insulators
+* Transformers
+* Cutouts and arresters
+* Switches and grounds
+* Guys and anchors
+* Communications attachments
+* Other visible components
+* Before, during, or after-work classification
+* Visible installed, removed, replaced, transferred, or unchanged equipment
+* Component and work quantities
+* Company catalog matches
+* Company work-action and work-package matches
+* Required photos, forms, signatures, and documentation
+* Missing evidence or additional photos required
+
+Each field must contain:
+
+* Proposed value
+* Confidence level
+* Evidence or image region supporting it
+* Source: image, OCR, metadata, job context, or company catalog
+* Review state: pending, accepted, edited, or rejected
+
+When confidence is insufficient, do not guess. Ask for a specific additional image such as:
+
+* Full-pole view
+* Pole-tag close-up
+* Pole-top/framing view
+* Transformer or equipment close-up
+* Before or after photo
+
+Foreman confirmation
+
+The foreman remains the final authority.
+
+* AI may pre-fill the job but cannot finalize safety findings, specifications, work performed, quantities, materials, work units, rates, billing, or completion.
+* Show low-confidence and conflicting fields prominently.
+* Allow quick accept-all for high-confidence noncritical fields, while still requiring individual resolution of low-confidence or billing-relevant fields.
+* Require final confirmation before company rules generate billing suggestions.
+* Preserve a complete manual-entry fallback.
+
+Company isolation and matching
+
+Only retrieve and match against the current company’s:
+
+* Customers and contracts
+* Projects and work orders
+* Pole and component catalogs
+* Construction standards
+* Work actions and packages
+* Material kits
+* Required documentation
+* Effective rate versions
+
+Never expose or suggest data belonging to another company.
+
+Persistence and auditing
+
+Create a versioned analysis record containing:
+
+* Original image
+* Raw structured model response
+* Model and prompt version
+* Confidence and evidence per field
+* Original AI proposals
+* Foreman accept/edit/reject decisions
+* Confirmed values
+* User and company IDs
+* Analysis, review, and confirmation timestamps
+
+Re-analysis must create a new version and must never silently overwrite confirmed information. Uploads, analysis retries, draft application, and confirmation must be atomic, idempotent, and concurrency-safe. Completed or locked reports must remain protected.
+
+Preserve existing JPEG/PNG/WebP byte validation, MIME matching, size limits, private access controls, and authorization rules.
+
+Required tests
+
+Add tests covering:
+
+* Photo-first foreman home layout
+* Mobile camera and upload fallback
+* Correct company and job matching
+* Ambiguous and incorrect job matches
+* OCR and field-level structured output
+* Auto-filled draft persistence
+* Per-field accept, edit, and reject behavior
+* Required confirmation gate
+* Low-confidence and additional-photo handling
+* Cross-company isolation
+* Foreman assignment authorization
+* Completed-report locking
+* Retry, idempotency, and concurrency behavior
+* Re-analysis and audit history
+* Fictional or de-identified pole-photo fixtures
+* Field-level recognition scoring
+* Mobile widths of 320px, 375px, 390px, and 430px
+
+Acceptance criteria
+
+A foreman should be able to open Redline, take one photo immediately, and receive a substantially pre-filled job without manually hunting through menus or searching for the report. Manual job selection should only be necessary when the match is uncertain. No AI-generated job fact or billing-relevant value becomes final without explicit foreman confirmation.
+
+Implement working end-to-end behavior, not only mockups or architecture documents. Work on a non-main branch, add regression tests, run the full available validation suite, and open or update a draft pull request. Do not merge, deploy, push directly to main, or activate paid services.

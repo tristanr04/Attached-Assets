@@ -1,41 +1,62 @@
 ---
 name: PKB build state
-description: What was built for the Pole Knowledge Base tasks (#18–#28), key schema quirks, and what's still pending.
+description: What was built for the Pole Knowledge Base tasks (#18–#28) and the Photo-to-Job Pole Filler, key schema quirks, and what's still pending.
 ---
 
 ## Status
-Tasks #18–#28 are substantially implemented across DB schema, API routes, and UI.
+Tasks #18–#28 are substantially implemented. Photo-to-Job Pole Filler is fully implemented and tested.
 
-## Schema quirks
-- `daily_reports` now has `work_package_id` integer column (added in this session; pushed via drizzle push)
-- `pkb_version_status` enum defined once in `pkb-pole-types.ts`; all other PKB tables import it as `pkbVersionStatusEnum` and use column name `version_status` (no suffix)
-- `pkb_import_jobs` schema uses: `fileName` (required), `insertedCount`, `updatedCount`, `skippedCount`, `errorCount`, `results` (JSONB for row errors), status enum values are `"pending"|"processing"|"completed"|"failed"` — NOT `"complete"`
+## Photo-to-Job Pole Filler (new feature, Aug 2026)
+- DB table: `pole_analyses` — stores original photo (base64, immutable), GPS, OCR, AI proposals, confirmation, audit log
+- API routes in `artifacts/api-server/src/routes/pole-capture.ts` (registered in routes/index.ts):
+  - POST /api/pole-capture/analyze — accepts photo + GPS, fires OpenAI Vision (gpt-4o) in background, returns {id, status:"analyzing"}
+  - GET  /api/pole-capture/recent — recent analyses for company (7 days)
+  - GET  /api/pole-capture/:id — get single analysis (polls until status != "analyzing")
+  - POST /api/pole-capture/:id/confirm — foreman confirms fields, creates/updates draft report
+  - POST /api/pole-capture/:id/retry — resets error analyses to "analyzing" and re-runs
+- Pure business logic extracted to `artifacts/api-server/src/lib/pole-capture-logic.ts` — all testable without DB
+- 43 unit tests in `artifacts/api-server/src/__tests__/pole-capture.test.ts` — all pass (vitest)
+- Frontend: `/pole-capture` (capture entry page) and `/pole-capture/:id` (review page)
+- Dashboard: "Take Pole Photo" primary CTA card (primary color, AI badge, camera icon)
+- Routes added to App.tsx at /pole-capture and /pole-capture/:id
+
+## Confirmation gate
+- Nothing written to report until foreman presses "Confirm Pole Analysis"
+- Cross-company guard: project.companyId must === analysis.companyId
+- Cannot confirm if status != "pending" (blocks double-confirm, analyzing, error)
+- Cannot confirm if completed report already exists today for that project
+- Duplicate gate: same pole tag + company + today → 409 with duplicateAnalysisId in response
+- Already-confirmed is idempotent: returns {reportId, alreadyConfirmed: true}
+
+## Scoring algorithm (scoreProjects in logic module)
+- Pole tag hit in recent reports: +0.55 (method="pole_tag")
+- Draft report for project today: +0.35 (method="schedule")
+- Project status=="active": +0.10
+- Capped at 0.99, threshold 0.05 to appear in candidates
+- Returns sorted descending; caller slices to 5
+
+## PKB schema quirks
+- `daily_reports` has `work_package_id` integer column (added)
+- `pkb_version_status` enum in pkb-pole-types.ts; all other PKB tables import it
+- `pkb_import_jobs`: fileName (required), insertedCount, updatedCount, skippedCount, errorCount, results (JSONB), status enum: "pending|processing|completed|failed" (NOT "complete")
 
 ## API routes
-- All PKB CRUD routes are at `/pkb/...` (not `/api/pkb/...`) — Express mounts pkbRouter at `/api`, so `/pkb/...` becomes `/api/pkb/...`
-- Billing suggestion/validation routes ARE at `/api/reports/:reportId/billing-suggestions` etc. — they live in the same pkb.ts router which is mounted at `/api`, so path is `/api/api/reports/...` — **BUG**: check these routes have correct prefix; they should be `/reports/:reportId/...` without the `/api` prefix in the router file since the router is already mounted at `/api`
+- PKB CRUD at `/pkb/...` → mounted at `/api` → full path `/api/pkb/...`
+- Billing suggestion/validation routes in pkb.ts may have double `/api` prefix issue — check before use
 
 ## OpenAI integration
-- Provisioned via `setupReplitAIIntegrations({ providerSlug: "openai" })`
-- Env vars: `AI_INTEGRATIONS_OPENAI_BASE_URL`, `AI_INTEGRATIONS_OPENAI_API_KEY` (both set)
-- Template files copied to `lib/integrations-openai-ai-server/` and `lib/integrations-openai-ai-react/`
-- `@workspace/integrations-openai-ai-server` added to `artifacts/api-server/package.json`
-- tsconfig references added to root `tsconfig.json` and `artifacts/api-server/tsconfig.json`
-- Conversations/messages schema exported from `lib/db/src/schema/index.ts`
-- Vision analysis model: `gpt-5.6-luna` (cost-effective for high-volume photo analysis)
+- Provisioned via setupReplitAIIntegrations; AI_INTEGRATIONS_OPENAI_BASE_URL + AI_INTEGRATIONS_OPENAI_API_KEY set
+- Template packages in lib/integrations-openai-ai-server/ and lib/integrations-openai-ai-react/
+- Vision model in pole-capture: gpt-4o (standard), NOT gpt-5.6-luna
 
-## UI pages built
-- `/settings/pkb/:section` — full admin shell with 10 sections; all wired
-- `/reports/:id/billing` — BillingReviewPage; AI generation + validation + approve/return flow
-- Report wizard step-basics: work package selector (saves `workPackageId` on report)
-- Report wizard step-photos: work-package-driven required photo checklist; smart camera pre-select; soft block on Next
-- Report detail: "Billing Review" button added (desktop bar only — mobile still needs wiring)
+## Test infrastructure
+- Vitest installed in artifacts/api-server (devDependency)
+- `pnpm test` runs vitest in api-server
+- Tests are pure (no DB mock needed) — business logic extracted to lib/pole-capture-logic.ts
 
 ## Known incomplete items
-- Billing suggestion/validation routes in pkb.ts may have double `/api` prefix issue (routes written as `/api/reports/:reportId/...` inside a router mounted at `/api`) — verify with a real request
-- Visual References list thumbnails show placeholder (no image); full image loads on lightbox click — by design for performance
-- Training examples section is labeled "Configuration Validation" in the PKB sidebar — naming mismatch; section shows training examples, not config validation
-- No UI entry point to call `/api/pkb/analyze` from within the photo step (Task #31 proposed)
-- CSV import silently skips conflicts with no warning (Task #32 proposed)
-
-**Why:** Route double-prefix is a known pattern issue from the PKB router being mounted at `/api` but billing routes were written with `/api/reports/...` prefix. Fix by removing the `/api` prefix from those specific routes in pkb.ts.
+- Mobile billing button on report detail: inside hidden md:flex → not visible on mobile
+- Training examples section labeled "Configuration Validation" in PKB sidebar — naming mismatch
+- Visual references thumbnails show placeholder (by design, full image on lightbox click)
+- No UI entry point to call /api/pkb/analyze from photo step (vision analyze for PKB training)
+- CSV import silently skips conflicts with no warning

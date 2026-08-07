@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
-import { FileText, Plus, Clock, Users, HardHat, AlertCircle, Loader2, CheckCircle2 } from "lucide-react";
+import { FileText, Plus, Clock, Users, HardHat, AlertCircle, Loader2, CheckCircle2, Camera, Zap } from "lucide-react";
 import { format } from "date-fns";
 
 export default function DashboardPage() {
@@ -36,6 +36,33 @@ export default function DashboardPage() {
         <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight uppercase">Dashboard</h1>
         <p className="text-muted-foreground font-medium text-base md:text-lg mt-1">{format(new Date(), 'EEEE, MMMM do, yyyy')}</p>
       </div>
+
+      {/* ── Photo-to-Job CTA ── first and most prominent ───────────────────── */}
+      <Link href="/pole-capture">
+        <div className="bg-primary rounded-2xl p-6 md:p-8 shadow-2xl shadow-primary/30 relative overflow-hidden cursor-pointer active:scale-[0.98] transition-transform">
+          {/* Background glow */}
+          <div className="absolute inset-0 opacity-20 pointer-events-none">
+            <div className="absolute -right-12 -top-12 w-64 h-64 rounded-full bg-white/30 blur-3xl" />
+          </div>
+          <div className="relative z-10 flex items-center justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <Zap className="h-4 w-4 text-primary-foreground/80" fill="currentColor" />
+                <span className="text-primary-foreground/80 text-xs font-bold uppercase tracking-widest">AI-Powered</span>
+              </div>
+              <h2 className="text-2xl md:text-3xl font-black text-primary-foreground tracking-tight mb-1">
+                Take Pole Photo
+              </h2>
+              <p className="text-primary-foreground/75 text-sm md:text-base leading-snug">
+                Snap a photo and Redline auto-fills pole details, equipment, and job match.
+              </p>
+            </div>
+            <div className="shrink-0 w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-white/15 flex items-center justify-center">
+              <Camera className="h-8 w-8 md:h-10 md:w-10 text-primary-foreground" strokeWidth={1.5} />
+            </div>
+          </div>
+        </div>
+      </Link>
 
       {/* Primary Action Area */}
       <div className="bg-card border border-border p-5 md:p-10 rounded-2xl shadow-lg relative overflow-hidden">

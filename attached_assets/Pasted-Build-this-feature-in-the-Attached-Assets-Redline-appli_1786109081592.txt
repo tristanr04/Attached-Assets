@@ -1,0 +1,145 @@
+Build this feature in the Attached Assets / Redline application.
+
+HIGHEST PRIORITY: PHOTO-TO-JOB POLE FILLER
+
+Make the photo filler the first and most obvious thing a foreman sees when opening the app.
+
+PHOTO-FIRST HOME SCREEN
+
+- Place a large full-width "Take Pole Photo" button at the top of the foreman home screen.
+- It must be visible without scrolling.
+- One tap should open the phone's rear camera.
+- Put "Upload Existing Photo" directly underneath it.
+- Do not hide this feature in a menu, tab, report, or small icon.
+- Put recent jobs and other actions below the photo controls.
+- Make it easy to use one-handed on a phone.
+
+REQUIRED WORKFLOW
+
+1. The foreman takes or uploads a pole photo.
+2. Save the original photo securely before analysis.
+3. Automatically identify the correct job using:
+   - Foreman's company and assigned jobs
+   - Active projects and work orders
+   - GPS and mapped location
+   - Photo timestamp
+   - OCR pole number or pole tag
+   - Current crew and schedule
+4. If one job is a strong match, preselect it and label it "Suggested Job."
+5. If uncertain, show up to three likely jobs for one-tap selection.
+6. Never silently attach a photo to the wrong job or another company.
+7. Analyze the photo and auto-fill the selected job with AI-proposed draft values.
+8. Open a review screen showing the photo beside the populated job fields.
+9. Require the foreman to accept, edit, or reject the important proposed values.
+10. Require the foreman to press "Confirm Pole Analysis."
+11. Nothing created by the analysis can be submitted, approved, completed, or billed before confirmation.
+
+SPECIFIC POLE ANALYSIS
+
+Return structured fields instead of a generic AI description:
+
+- Pole number and tag
+- GPS and mapped location
+- Pole material, class, height, and visible condition
+- Structure, framing, and configuration
+- Circuit, voltage, and phase when reliably supported
+- Conductors and neutral arrangement
+- Crossarms and braces
+- Insulators
+- Transformers
+- Cutouts and arresters
+- Switches and grounds
+- Guys and anchors
+- Communication attachments
+- Other visible components
+- Before, during, or after-work classification
+- Equipment installed, removed, replaced, transferred, or unchanged
+- Component and work quantities
+- Matching company catalog items
+- Matching work actions and work packages
+- Required photos, forms, signatures, and documentation
+- Missing information or additional photos needed
+
+Every proposed field must include:
+
+- Proposed value
+- Confidence level
+- Evidence or part of the image supporting it
+- Source such as image, OCR, GPS, job context, or company catalog
+- Review status: pending, accepted, edited, or rejected
+
+If the image is unclear, do not guess. Ask for a specific additional photo such as:
+
+- Full pole view
+- Pole tag close-up
+- Pole top and framing view
+- Transformer or equipment close-up
+- Before or after photo
+
+FOREMAN CONFIRMATION
+
+- All auto-filled information must be labeled "AI Proposed."
+- The foreman is the final authority.
+- AI cannot independently finalize safety findings, specifications, work performed, quantities, materials, work units, rates, billing, or job completion.
+- Highlight low-confidence or conflicting fields.
+- Let the foreman quickly accept accurate fields and edit or reject incorrect ones.
+- Low-confidence and billing-related fields must be individually resolved.
+- Require final confirmation before generating billing suggestions.
+- Include a complete manual-entry fallback.
+
+COMPANY ISOLATION
+
+Only match against the current company's:
+
+- Customers and contracts
+- Projects and work orders
+- Pole and component catalogs
+- Construction standards
+- Work actions and work packages
+- Material kits
+- Documentation requirements
+- Current effective rates
+
+Never expose or suggest information from another company.
+
+AUDIT HISTORY
+
+Save:
+
+- Original photo
+- Raw structured analysis
+- Model and prompt version
+- Confidence and evidence for each field
+- Original AI proposal
+- Foreman accept, edit, or reject decisions
+- Final confirmed values
+- User and company IDs
+- Analysis and confirmation timestamps
+
+Re-analysis must create a new version and never silently overwrite confirmed information. Uploads, retries, draft filling, and confirmation must be atomic, idempotent, and concurrency-safe. Completed or locked reports must remain protected.
+
+TESTING
+
+Add tests for:
+
+- Photo-first home screen
+- Mobile camera and upload fallback
+- Correct company and job matching
+- Ambiguous and incorrect job matches
+- Auto-filled draft persistence
+- Field acceptance, editing, and rejection
+- Required confirmation gate
+- Low-confidence handling
+- Cross-company isolation
+- Foreman authorization
+- Completed-report locking
+- Retry, duplicate, and concurrency behavior
+- Re-analysis and audit history
+- Fictional or de-identified pole photo fixtures
+- Mobile widths of 320, 375, 390, and 430 pixels
+
+SUCCESS REQUIREMENT
+
+A foreman must be able to open Redline, immediately take one picture, and receive a substantially pre-filled job without searching through menus or manually finding the report. Manual job selection should only be required when the automatic match is uncertain.
+
+Implement working end-to-end behavior, not only a mockup or written plan. Use the application's existing authentication, company isolation, job, report, camera, and photo systems. Do not create duplicate workflows. Do not merge, deploy, activate paid services, or remove existing security protections.

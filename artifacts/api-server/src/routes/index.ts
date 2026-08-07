@@ -12,6 +12,7 @@ import laborClassificationsRouter from "./labor-classifications";
 import billableItemsRouter from "./billable-items";
 import reportTemplatesRouter from "./report-templates";
 import pkbRouter from "./pkb";
+import poleCaptureRouter from "./pole-capture";
 
 const router: IRouter = Router();
 
@@ -28,5 +29,6 @@ router.use(laborClassificationsRouter);
 router.use(billableItemsRouter);
 router.use(reportTemplatesRouter);
 router.use(pkbRouter);
+router.use(poleCaptureRouter);
 
 export default router;

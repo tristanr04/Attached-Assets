@@ -32,6 +32,8 @@ import ProjectsListPage from "@/pages/projects/index";
 import SettingsPage from "@/pages/settings";
 import RatesSettingsPage from "@/pages/settings/rates";
 import PoleKnowledgeCenterPage from "@/pages/settings/pkb/index";
+import PoleCaptureEntryPage from "@/pages/pole-capture/index";
+import PoleAnalysisReviewPage from "@/pages/pole-capture/review";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useGetMe, useListCompanies, useUpsertMe, getListCompaniesQueryKey } from "@workspace/api-client-react";
@@ -270,6 +272,12 @@ function ClerkProviderWithRoutes() {
         </Route>
         <Route path="/settings/pkb">
           {() => <ProtectedRoute component={() => <PoleKnowledgeCenterPage section="pole-types" />} />}
+        </Route>
+        <Route path="/pole-capture/:id">
+          {(params) => <ProtectedRoute component={() => <PoleAnalysisReviewPage id={parseInt(params.id)} />} />}
+        </Route>
+        <Route path="/pole-capture">
+          {() => <ProtectedRoute component={PoleCaptureEntryPage} />}
         </Route>
       </Switch>
     </ClerkProvider>

@@ -32,3 +32,4 @@ export * from "./conversations";
 export * from "./messages";
 export * from "./pkb-training-examples";
 export * from "./pkb-report-billing";
+export * from "./pole-analyses";
