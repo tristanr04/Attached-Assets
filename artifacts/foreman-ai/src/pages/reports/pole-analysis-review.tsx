@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { requestJson } from "@/lib/report-initialization";
 import {
   buildPoleConfirmationKey,
+  buildPoleManualFallbackKey,
   displayPoleValue,
   parseEditedPoleValue,
   reviewedFieldCount,
@@ -47,6 +48,17 @@ interface DecisionDraft {
   editedValue?: string;
 }
 
+interface PoleAnalysisJobStatus {
+  id: number;
+  generation: number;
+  status: string;
+  attemptCount: number;
+  maxAttempts: number;
+  availableAt: string;
+  lastErrorCode: string | null;
+  canManualFallback: boolean;
+}
+
 const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 function confidenceTone(confidence: number) {
@@ -70,11 +82,16 @@ export default function PoleAnalysisReviewCard({
   const queryKey = [`${baseUrl}${endpoint}`];
   const [decisions, setDecisions] = useState<Record<string, DecisionDraft | undefined>>({});
 
-  const { data, isLoading, isError } = useQuery<{ analysis: PoleAnalysisReview | null }>({
+  const { data, isLoading, isError } = useQuery<{ analysis: PoleAnalysisReview | null; job: PoleAnalysisJobStatus | null }>({
     queryKey,
     queryFn: () => requestJson(fetch, `${baseUrl}${endpoint}`),
+    refetchInterval: query => {
+      const current = query.state.data as { job?: PoleAnalysisJobStatus | null } | undefined;
+      return current?.job && ["queued", "processing", "retry_wait"].includes(current.job.status) ? 5_000 : false;
+    },
   });
   const analysis = data?.analysis ?? null;
+  const job = data?.job ?? null;
   const reviewed = reviewedFieldCount(analysis?.fields.map(field => field.key) ?? [], decisions);
   const allReviewed = Boolean(analysis?.fields.length) && reviewed === analysis!.fields.length;
 
@@ -88,6 +105,16 @@ export default function PoleAnalysisReviewCard({
     window.localStorage.setItem(storageKey, created);
     return created;
   }, [analysis?.analysisRunId, analysis?.version]);
+
+  const manualFallbackKey = useMemo(() => {
+    if (!job?.canManualFallback) return null;
+    const storageKey = `redline:pole-manual:${job.id}:${job.generation}`;
+    const existing = window.localStorage.getItem(storageKey);
+    if (existing) return existing;
+    const created = buildPoleManualFallbackKey(job.id, job.generation, window.crypto.randomUUID());
+    window.localStorage.setItem(storageKey, created);
+    return created;
+  }, [job?.id, job?.generation, job?.canManualFallback]);
 
   const confirm = useMutation({
     mutationFn: async () => {
@@ -115,8 +142,57 @@ export default function PoleAnalysisReviewCard({
     onError: error => toast({ title: "Could not confirm analysis", description: String(error), variant: "destructive" }),
   });
 
+  const continueManually = useMutation({
+    mutationFn: async () => {
+      if (!job?.canManualFallback || !manualFallbackKey) throw new Error("Manual fallback is not available");
+      return requestJson(fetch, `${baseUrl}${endpoint}/manual-fallback`, {
+        method: "POST",
+        headers: { "Idempotency-Key": manualFallbackKey },
+      });
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey });
+      toast({ title: "Continue manually", description: "Automatic analysis was cancelled. Enter and verify every job field before submission." });
+    },
+    onError: error => toast({ title: "Could not continue manually", description: String(error), variant: "destructive" }),
+  });
+
   if (isLoading) return <div className="px-3 pb-3 text-xs text-muted-foreground">Checking for pole analysis…</div>;
   if (isError) return <div className="px-3 pb-3 text-xs text-destructive">Analysis status could not be loaded. Retry when connected.</div>;
+  if (!analysis && job) {
+    const pending = ["queued", "processing", "retry_wait"].includes(job.status);
+    return (
+      <Card className="mx-3 mb-3 border-primary/40">
+        <CardContent className="p-3 sm:p-4">
+          <div className="flex flex-wrap items-start gap-3">
+            {pending && <Loader2 className="mt-0.5 h-5 w-5 shrink-0 animate-spin text-primary" />}
+            {!pending && <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-yellow-600" />}
+            <div className="min-w-0 flex-1">
+              <p className="font-extrabold">{pending ? "Pole analysis pending" : job.status === "cancelled" ? "Continuing manually" : "Automatic analysis unavailable"}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {job.status === "cancelled"
+                  ? "No AI values were applied. Enter and verify every pole and billing-relevant field manually."
+                  : `Attempt ${job.attemptCount} of ${job.maxAttempts}. You may wait or continue with manual entry.`}
+              </p>
+            </div>
+          </div>
+          {job.canManualFallback && (
+            <Button
+              type="button"
+              variant="outline"
+              className="mt-4 h-12 w-full whitespace-normal font-bold"
+              onClick={() => continueManually.mutate()}
+              disabled={locked || continueManually.isPending}
+            >
+              {continueManually.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Continue manually
+            </Button>
+          )}
+          {job.canManualFallback && <p className="mt-2 text-xs text-muted-foreground">This cancels only this automatic analysis job. It does not confirm pole facts or approve billing.</p>}
+        </CardContent>
+      </Card>
+    );
+  }
   if (!analysis) return null;
 
   if (analysis.status === "foreman_confirmed") {

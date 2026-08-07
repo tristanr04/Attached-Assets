@@ -12,6 +12,18 @@ export function buildPoleConfirmationKey(
   return `confirm:${analysisRunId}:${version}:${safeNonce}`.slice(0, 128);
 }
 
+export function buildPoleManualFallbackKey(
+  jobId: number,
+  generation: number,
+  nonce: string,
+): string {
+  const safeNonce = nonce.replace(/[^A-Za-z0-9._:-]/g, "").slice(0, 64);
+  if (!Number.isSafeInteger(jobId) || jobId <= 0) throw new Error("Invalid analysis job");
+  if (!Number.isSafeInteger(generation) || generation <= 0) throw new Error("Invalid analysis generation");
+  if (safeNonce.length < 8) throw new Error("Unable to create a safe fallback key");
+  return `manual:${jobId}:${generation}:${safeNonce}`.slice(0, 128);
+}
+
 export function displayPoleValue(value: unknown): string {
   if (typeof value === "string") return value;
   if (value === null) return "Not detected";

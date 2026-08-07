@@ -4,6 +4,7 @@ import test from "node:test";
 
 import {
   buildPoleConfirmationKey,
+  buildPoleManualFallbackKey,
   displayPoleValue,
   parseEditedPoleValue,
   reviewedFieldCount,
@@ -15,6 +16,14 @@ test("pole confirmation keys are bounded and retry-safe", () => {
   assert.ok(key.length <= 128);
   assert.throws(() => buildPoleConfirmationKey(0, 3, "fixture-nonce-001"));
   assert.throws(() => buildPoleConfirmationKey(12, 3, "short"));
+});
+
+test("manual fallback keys are bounded and generation-specific", () => {
+  const key = buildPoleManualFallbackKey(31, 2, "fixture-nonce-002");
+  assert.equal(key, "manual:31:2:fixture-nonce-002");
+  assert.ok(key.length <= 128);
+  assert.throws(() => buildPoleManualFallbackKey(0, 2, "fixture-nonce-002"));
+  assert.throws(() => buildPoleManualFallbackKey(31, 0, "fixture-nonce-002"));
 });
 
 test("pole review values support structured edits without forcing JSON for plain text", () => {
@@ -41,4 +50,9 @@ test("pole review UI retains narrow-screen and explicit human-authority controls
   assert.match(source, /Confirm Pole Analysis/);
   assert.match(source, /disabled=\{!allReviewed/);
   assert.match(source, /Idempotency-Key/);
+  assert.match(source, /Continue manually/);
+  assert.match(source, /manual-fallback/);
+  assert.match(source, /No AI values were applied/);
+  assert.match(source, /h-12 w-full/);
+  assert.match(source, /refetchInterval/);
 });

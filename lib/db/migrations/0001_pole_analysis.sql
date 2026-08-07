@@ -65,6 +65,10 @@ CREATE TABLE IF NOT EXISTS pole_analysis_jobs (
   lease_expires_at timestamptz,
   last_error_code text,
   last_error_at timestamptz,
+  manual_fallback_idempotency_key text,
+  cancelled_by_user_id integer REFERENCES users(id),
+  cancelled_at timestamptz,
+  cancellation_reason text CHECK (cancellation_reason IS NULL OR cancellation_reason IN ('manual_fallback', 'locked_report')),
   completed_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
@@ -72,6 +76,7 @@ CREATE TABLE IF NOT EXISTS pole_analysis_jobs (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS pole_analysis_jobs_company_request_uq ON pole_analysis_jobs(company_id, request_key);
 CREATE UNIQUE INDEX IF NOT EXISTS pole_analysis_jobs_photo_generation_uq ON pole_analysis_jobs(photo_id, generation);
+CREATE UNIQUE INDEX IF NOT EXISTS pole_analysis_jobs_company_manual_fallback_uq ON pole_analysis_jobs(company_id, manual_fallback_idempotency_key) WHERE manual_fallback_idempotency_key IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS pole_analysis_runs (
   id serial PRIMARY KEY,

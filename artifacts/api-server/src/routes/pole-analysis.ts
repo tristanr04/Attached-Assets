@@ -8,6 +8,7 @@ import {
   poleAnalysisDecisionsTable,
   poleAnalysisCandidatesTable,
   poleAnalysisFieldsTable,
+  poleAnalysisJobsTable,
   poleAnalysisRunsTable,
 } from "@workspace/db";
 
@@ -18,6 +19,7 @@ import {
 } from "../lib/poleAnalysisContract";
 import { requireAuth, type AuthenticatedRequest } from "../middlewares/requireAuth";
 import { parsePositiveId } from "../lib/requestValues";
+import { parseIdempotencyKey } from "../lib/idempotency";
 import { canAccessReport } from "../lib/reportState";
 
 const router: IRouter = Router();
@@ -103,12 +105,132 @@ router.get(
       eq(poleAnalysisRunsTable.reportId, reportId),
       eq(poleAnalysisRunsTable.photoId, photoId),
     )).orderBy(desc(poleAnalysisRunsTable.version)).limit(1);
+    const [job] = await db.select({
+      id: poleAnalysisJobsTable.id,
+      generation: poleAnalysisJobsTable.generation,
+      status: poleAnalysisJobsTable.status,
+      attemptCount: poleAnalysisJobsTable.attemptCount,
+      maxAttempts: poleAnalysisJobsTable.maxAttempts,
+      availableAt: poleAnalysisJobsTable.availableAt,
+      lastErrorCode: poleAnalysisJobsTable.lastErrorCode,
+      createdAt: poleAnalysisJobsTable.createdAt,
+      updatedAt: poleAnalysisJobsTable.updatedAt,
+    }).from(poleAnalysisJobsTable).where(and(
+      eq(poleAnalysisJobsTable.companyId, report.companyId),
+      eq(poleAnalysisJobsTable.reportId, reportId),
+      eq(poleAnalysisJobsTable.photoId, photoId),
+    )).orderBy(desc(poleAnalysisJobsTable.generation)).limit(1);
     res.json({
       analysis: run ? {
         ...await reviewResponseFor(run),
         canConfirm: Boolean(membership.userId && membership.userId === report.foremanId),
       } : null,
+      job: job ? {
+        ...job,
+        canManualFallback: !run
+          && report.status === "draft"
+          && Boolean(membership.userId && membership.userId === report.foremanId)
+          && ["queued", "processing", "retry_wait", "failed"].includes(job.status),
+      } : null,
     });
+  },
+);
+
+router.post(
+  "/reports/:reportId/photos/:photoId/pole-analysis/manual-fallback",
+  requireAuth,
+  async (req: AuthenticatedRequest, res): Promise<void> => {
+    if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
+    const reportId = parsePositiveId(req.params.reportId);
+    const photoId = parsePositiveId(req.params.photoId);
+    const idempotencyKey = parseIdempotencyKey(req.get("Idempotency-Key"));
+    if (reportId === null || photoId === null) {
+      res.status(400).json({ error: "Invalid report or photo identifier" });
+      return;
+    }
+    if (!idempotencyKey) {
+      res.status(400).json({ error: "A valid Idempotency-Key is required" });
+      return;
+    }
+
+    try {
+      const outcome = await db.transaction(async tx => {
+        await tx.execute(sql`select id from daily_reports where id = ${reportId} for update`);
+        const [report] = await tx.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
+        if (!report) return { code: 404 as const, error: "Not found" };
+
+        const [membership] = await tx.select().from(companyMembershipsTable).where(and(
+          eq(companyMembershipsTable.companyId, report.companyId),
+          eq(companyMembershipsTable.clerkUserId, req.clerkUserId!),
+        ));
+        if (!membership?.userId || membership.userId !== report.foremanId) {
+          return { code: 403 as const, error: "Only the assigned foreman can continue manually" };
+        }
+        if (report.status !== "draft") return { code: 403 as const, error: "Cannot change analysis on a completed report" };
+
+        const [photo] = await tx.select({ id: photosTable.id }).from(photosTable).where(and(
+          eq(photosTable.id, photoId),
+          eq(photosTable.reportId, reportId),
+        ));
+        if (!photo) return { code: 404 as const, error: "Photo not found on this report" };
+
+        const [existingRun] = await tx.select({ id: poleAnalysisRunsTable.id }).from(poleAnalysisRunsTable).where(and(
+          eq(poleAnalysisRunsTable.companyId, report.companyId),
+          eq(poleAnalysisRunsTable.reportId, reportId),
+          eq(poleAnalysisRunsTable.photoId, photoId),
+        )).limit(1);
+        if (existingRun) return { code: 409 as const, error: "Review the existing AI proposal instead of continuing manually" };
+
+        const [jobIdentity] = await tx.select({ id: poleAnalysisJobsTable.id }).from(poleAnalysisJobsTable).where(and(
+          eq(poleAnalysisJobsTable.companyId, report.companyId),
+          eq(poleAnalysisJobsTable.reportId, reportId),
+          eq(poleAnalysisJobsTable.photoId, photoId),
+        )).orderBy(desc(poleAnalysisJobsTable.generation)).limit(1);
+        if (!jobIdentity) return { code: 404 as const, error: "Pole analysis job not found" };
+
+        await tx.execute(sql`select id from pole_analysis_jobs where id = ${jobIdentity.id} for update`);
+        const [job] = await tx.select().from(poleAnalysisJobsTable).where(and(
+          eq(poleAnalysisJobsTable.id, jobIdentity.id),
+          eq(poleAnalysisJobsTable.companyId, report.companyId),
+          eq(poleAnalysisJobsTable.reportId, reportId),
+          eq(poleAnalysisJobsTable.photoId, photoId),
+        ));
+        if (!job) return { code: 404 as const, error: "Pole analysis job not found" };
+        if (job.status === "cancelled") {
+          if (job.manualFallbackIdempotencyKey !== idempotencyKey) {
+            return { code: 409 as const, error: "Pole analysis was already cancelled by another request" };
+          }
+          return { code: 200 as const, value: { jobId: job.id, status: job.status, replayed: true } };
+        }
+        if (!["queued", "processing", "retry_wait", "failed"].includes(job.status)) {
+          return { code: 409 as const, error: "Pole analysis can no longer be continued manually" };
+        }
+
+        const now = new Date();
+        const [cancelled] = await tx.update(poleAnalysisJobsTable).set({
+          status: "cancelled",
+          manualFallbackIdempotencyKey: idempotencyKey,
+          cancelledByUserId: membership.userId,
+          cancelledAt: now,
+          cancellationReason: "manual_fallback",
+          leaseOwner: null,
+          leaseExpiresAt: null,
+          completedAt: now,
+          updatedAt: now,
+        }).where(and(
+          eq(poleAnalysisJobsTable.id, job.id),
+          eq(poleAnalysisJobsTable.status, job.status),
+        )).returning();
+        if (!cancelled) throw new Error("Pole analysis job changed during manual fallback");
+        return { code: 200 as const, value: { jobId: cancelled.id, status: cancelled.status, replayed: false } };
+      });
+
+      if ("error" in outcome) { res.status(outcome.code).json({ error: outcome.error }); return; }
+      res.status(outcome.code).json(outcome.value);
+    } catch (error) {
+      console.error("Pole analysis manual fallback failed", error);
+      res.status(409).json({ error: "Could not continue manually; retry with the same request" });
+    }
   },
 );
 

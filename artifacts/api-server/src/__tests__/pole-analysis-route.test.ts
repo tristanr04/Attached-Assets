@@ -24,10 +24,26 @@ test("review reads enforce report access and return structured evidence without 
   assert.match(route, /analysis: run \? \{/);
   assert.match(route, /\.\.\.await reviewResponseFor\(run\)/);
   assert.match(route, /canConfirm: Boolean\(membership\.userId && membership\.userId === report\.foremanId\)/);
+  assert.match(route, /eq\(poleAnalysisJobsTable\.companyId, report\.companyId\)/);
+  assert.match(route, /eq\(poleAnalysisJobsTable\.reportId, reportId\)/);
+  assert.match(route, /eq\(poleAnalysisJobsTable\.photoId, photoId\)/);
+  assert.doesNotMatch(route, /leaseOwner: job\.leaseOwner|leaseExpiresAt: job\.leaseExpiresAt/);
+});
+
+test("manual fallback is assigned-foreman-only, serialized, and cannot bypass proposals", () => {
+  assert.match(route, /pole-analysis\/manual-fallback/);
+  assert.match(route, /parseIdempotencyKey\(req\.get\("Idempotency-Key"\)\)/);
+  assert.match(route, /membership\.userId !== report\.foremanId/);
+  assert.match(route, /Review the existing AI proposal instead of continuing manually/);
+  assert.match(route, /select id from pole_analysis_jobs where id = \$\{jobIdentity\.id\} for update/);
+  assert.match(route, /manualFallbackIdempotencyKey: idempotencyKey/);
+  assert.match(route, /cancelledByUserId: membership\.userId/);
+  assert.match(route, /cancellationReason: "manual_fallback"/);
+  assert.match(route, /replayed: true/);
 });
 
 test("pole analysis confirmation serializes writers and preserves completed-report locks", () => {
-  assert.equal((route.match(/for update/g) ?? []).length, 2);
+  assert.ok((route.match(/for update/g) ?? []).length >= 4);
   assert.match(route, /report\.status !== "draft"/);
   assert.match(route, /db\.transaction/);
   assert.match(route, /poleAnalysisDecisionsTable/);

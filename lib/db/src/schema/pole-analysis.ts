@@ -94,15 +94,23 @@ export const poleAnalysisJobsTable = pgTable("pole_analysis_jobs", {
   leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
   lastErrorCode: text("last_error_code"),
   lastErrorAt: timestamp("last_error_at", { withTimezone: true }),
+  manualFallbackIdempotencyKey: text("manual_fallback_idempotency_key"),
+  cancelledByUserId: integer("cancelled_by_user_id").references(() => usersTable.id),
+  cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+  cancellationReason: text("cancellation_reason"),
   completedAt: timestamp("completed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, table => [
   uniqueIndex("pole_analysis_jobs_company_request_uq").on(table.companyId, table.requestKey),
   uniqueIndex("pole_analysis_jobs_photo_generation_uq").on(table.photoId, table.generation),
+  uniqueIndex("pole_analysis_jobs_company_manual_fallback_uq")
+    .on(table.companyId, table.manualFallbackIdempotencyKey)
+    .where(sql`${table.manualFallbackIdempotencyKey} is not null`),
   check("pole_analysis_jobs_generation_positive", sql`${table.generation} > 0`),
   check("pole_analysis_jobs_attempts_valid", sql`${table.attemptCount} >= 0 and ${table.maxAttempts} between 1 and 10 and ${table.attemptCount} <= ${table.maxAttempts}`),
   check("pole_analysis_jobs_status_allowed", sql`${table.status} in ('queued', 'processing', 'retry_wait', 'succeeded', 'failed', 'cancelled')`),
+  check("pole_analysis_jobs_cancellation_reason_allowed", sql`${table.cancellationReason} is null or ${table.cancellationReason} in ('manual_fallback', 'locked_report')`),
 ]);
 
 export const poleAnalysisRunsTable = pgTable("pole_analysis_runs", {
