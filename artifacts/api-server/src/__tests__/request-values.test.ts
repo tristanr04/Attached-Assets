@@ -7,7 +7,10 @@ import {
   selectCompanyMembership,
 } from "../lib/requestValues";
 import { pickMutableReportFields } from "../lib/reportInput";
-import { validatePhotoDataUrl } from "../lib/photoDataUrl";
+import {
+  validatePhotoDataUrl,
+  validateSignatureDataUrl,
+} from "../lib/photoDataUrl";
 import { canMutateReport, completionUpdate } from "../lib/reportState";
 
 test("parsePositiveId accepts only canonical positive integer strings", () => {
@@ -127,6 +130,38 @@ test("photo validation rejects spoofed, unsafe, malformed, and oversized data", 
     validatePhotoDataUrl("data:image/jpeg;base64," + jpeg, 4).valid,
     false,
   );
+});
+
+test("signature validation accepts images and enforces its smaller size cap", () => {
+  const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00]);
+  assert.equal(
+    validateSignatureDataUrl(
+      `data:image/jpeg;base64,${jpeg.toString("base64")}`,
+    ).valid,
+    true,
+  );
+
+  const oversized = Buffer.concat([
+    Buffer.from([0xff, 0xd8, 0xff]),
+    Buffer.alloc(2 * 1024 * 1024),
+  ]);
+  const result = validateSignatureDataUrl(
+    `data:image/jpeg;base64,${oversized.toString("base64")}`,
+  );
+  assert.deepEqual(result, {
+    valid: false,
+    error: "Image exceeds the 2 MB limit",
+  });
+});
+
+test("signature route validates bytes before persistence", async () => {
+  const source = await readFile(
+    new URL("../routes/reports.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(source, /const signatureValidation = validateSignatureDataUrl\(dataUrl\)/);
+  assert.match(source, /if \(!signatureValidation\.valid\)/);
 });
 
 test("company selection never accepts a company outside the user's memberships", () => {

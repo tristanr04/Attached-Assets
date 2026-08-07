@@ -8,7 +8,10 @@ import {
 } from "@workspace/db";
 import { requireAuth, type AuthenticatedRequest } from "../middlewares/requireAuth";
 import { pickMutableReportFields } from "../lib/reportInput";
-import { validatePhotoDataUrl } from "../lib/photoDataUrl";
+import {
+  validatePhotoDataUrl,
+  validateSignatureDataUrl,
+} from "../lib/photoDataUrl";
 import { parsePositiveId } from "../lib/requestValues";
 import { canMutateReport, completionUpdate } from "../lib/reportState";
 
@@ -629,6 +632,11 @@ router.post("/reports/:reportId/signature", requireAuth, async (req: Authenticat
   if (rejectLockedReport(report, m.role, res)) { return; }
   const { dataUrl } = req.body;
   if (!dataUrl) { res.status(400).json({ error: "dataUrl is required" }); return; }
+  const signatureValidation = validateSignatureDataUrl(dataUrl);
+  if (!signatureValidation.valid) {
+    res.status(400).json({ error: signatureValidation.error });
+    return;
+  }
 
   // Upsert signature
   const existing = await db.select().from(signaturesTable).where(eq(signaturesTable.reportId, reportId));

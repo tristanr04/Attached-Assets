@@ -1,4 +1,5 @@
 const DEFAULT_MAX_PHOTO_BYTES = 7 * 1024 * 1024;
+const MAX_SIGNATURE_BYTES = 2 * 1024 * 1024;
 
 const SIGNATURES: Record<string, (bytes: Buffer) => boolean> = {
   "image/jpeg": (bytes) =>
@@ -21,6 +22,13 @@ export type PhotoDataUrlValidation =
   | { valid: true; mimeType: string; size: number }
   | { valid: false; error: string };
 
+function sizeLimitLabel(maxBytes: number): string {
+  const megabytes = maxBytes / (1024 * 1024);
+  return Number.isInteger(megabytes)
+    ? `${megabytes} MB`
+    : `${maxBytes} bytes`;
+}
+
 export function validatePhotoDataUrl(
   value: unknown,
   maxBytes = DEFAULT_MAX_PHOTO_BYTES,
@@ -36,7 +44,7 @@ export function validatePhotoDataUrl(
 
   const [, mimeType, payload] = match;
   if (payload.length > Math.ceil(maxBytes / 3) * 4 + 4) {
-    return { valid: false, error: "Photo exceeds the 7 MB limit" };
+    return { valid: false, error: `Image exceeds the ${sizeLimitLabel(maxBytes)} limit` };
   }
 
   const bytes = Buffer.from(payload, "base64");
@@ -45,11 +53,17 @@ export function validatePhotoDataUrl(
     return { valid: false, error: "Photo contains invalid base64 data" };
   }
   if (bytes.length === 0 || bytes.length > maxBytes) {
-    return { valid: false, error: "Photo exceeds the 7 MB limit" };
+    return { valid: false, error: `Image exceeds the ${sizeLimitLabel(maxBytes)} limit` };
   }
   if (!SIGNATURES[mimeType](bytes)) {
     return { valid: false, error: "Photo content does not match its declared type" };
   }
 
   return { valid: true, mimeType, size: bytes.length };
+}
+
+export function validateSignatureDataUrl(
+  value: unknown,
+): PhotoDataUrlValidation {
+  return validatePhotoDataUrl(value, MAX_SIGNATURE_BYTES);
 }
