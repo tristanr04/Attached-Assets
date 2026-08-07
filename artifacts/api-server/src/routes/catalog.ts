@@ -2,6 +2,8 @@ import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
 import { db, catalogMaterialsTable, catalogEquipmentTable, companyMembershipsTable } from "@workspace/db";
 import { requireAuth, type AuthenticatedRequest } from "../middlewares/requireAuth";
+import { parsePositiveId } from "../lib/requestValues";
+import { parseOptionalText, parseRequiredText } from "../lib/billableItemInput";
 
 const router: IRouter = Router();
 
@@ -13,8 +15,8 @@ async function checkAccess(clerkUserId: string, companyId: number) {
 
 router.get("/catalog/materials", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const companyId = req.query.companyId ? parseInt(req.query.companyId as string, 10) : null;
-  if (!companyId) { res.status(400).json({ error: "companyId required" }); return; }
+  const companyId = parsePositiveId(req.query.companyId);
+  if (companyId === null) { res.status(400).json({ error: "Valid companyId required" }); return; }
 
   const m = await checkAccess(req.clerkUserId, companyId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
@@ -25,8 +27,10 @@ router.get("/catalog/materials", requireAuth, async (req: AuthenticatedRequest, 
 
 router.post("/catalog/materials", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const { companyId, name, unit } = req.body;
-  if (!companyId || !name || !unit) { res.status(400).json({ error: "companyId, name, unit required" }); return; }
+  const companyId = parsePositiveId(req.body?.companyId);
+  const name = parseRequiredText(req.body?.name);
+  const unit = parseRequiredText(req.body?.unit, 100);
+  if (companyId === null || name === null || unit === null) { res.status(400).json({ error: "Valid companyId, name, and unit required" }); return; }
 
   const m = await checkAccess(req.clerkUserId, companyId);
   if (!m || !["admin", "supervisor"].includes(m.role)) { res.status(403).json({ error: "Forbidden" }); return; }
@@ -37,8 +41,8 @@ router.post("/catalog/materials", requireAuth, async (req: AuthenticatedRequest,
 
 router.get("/catalog/equipment", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const companyId = req.query.companyId ? parseInt(req.query.companyId as string, 10) : null;
-  if (!companyId) { res.status(400).json({ error: "companyId required" }); return; }
+  const companyId = parsePositiveId(req.query.companyId);
+  if (companyId === null) { res.status(400).json({ error: "Valid companyId required" }); return; }
 
   const m = await checkAccess(req.clerkUserId, companyId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
@@ -49,8 +53,10 @@ router.get("/catalog/equipment", requireAuth, async (req: AuthenticatedRequest, 
 
 router.post("/catalog/equipment", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const { companyId, name, type } = req.body;
-  if (!companyId || !name) { res.status(400).json({ error: "companyId and name required" }); return; }
+  const companyId = parsePositiveId(req.body?.companyId);
+  const name = parseRequiredText(req.body?.name);
+  const type = parseOptionalText(req.body?.type, 200);
+  if (companyId === null || name === null || (type === undefined && req.body?.type !== undefined)) { res.status(400).json({ error: "Valid companyId, name, and type required" }); return; }
 
   const m = await checkAccess(req.clerkUserId, companyId);
   if (!m || !["admin", "supervisor"].includes(m.role)) { res.status(403).json({ error: "Forbidden" }); return; }

@@ -118,6 +118,43 @@ test("billable item routes fail closed on IDs and protected billing inputs", asy
   assert.equal(source.match(/expirationDate must not precede effectiveDate/g)?.length, 2);
 });
 
+test("project and catalog routes constrain company reads and reject ambiguous identifiers", async () => {
+  const projects = await readFile(
+    new URL("../routes/projects.ts", import.meta.url),
+    "utf8",
+  );
+  const catalog = await readFile(
+    new URL("../routes/catalog.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.doesNotMatch(projects, /parseInt\(/);
+  assert.doesNotMatch(catalog, /parseInt\(/);
+  assert.match(projects, /inArray\(projectsTable\.companyId, ids\)/);
+  assert.doesNotMatch(projects, /db\.select\(\)\.from\(projectsTable\)\)\.filter/);
+  assert.equal(projects.match(/parsePositiveId\(req\.params\.projectId\)/g)?.length, 2);
+  assert.equal(catalog.match(/parsePositiveId\(req\.query\.companyId\)/g)?.length, 2);
+  assert.equal(catalog.match(/parsePositiveId\(req\.body\?\.companyId\)/g)?.length, 2);
+});
+
+test("project and catalog inputs are bounded and project status is allowlisted", async () => {
+  const projects = await readFile(
+    new URL("../routes/projects.ts", import.meta.url),
+    "utf8",
+  );
+  const catalog = await readFile(
+    new URL("../routes/catalog.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(projects, /\["active", "inactive", "complete"\]\.includes\(req\.body\.status\)/);
+  assert.match(projects, /No valid project fields supplied/);
+  assert.equal(projects.match(/parseRequiredText\(/g)?.length, 2);
+  assert.equal(catalog.match(/parseRequiredText\(/g)?.length, 3);
+  assert.match(catalog, /parseOptionalText\(req\.body\?\.type, 200\)/);
+  assert.equal(catalog.match(/\["admin", "supervisor"\]\.includes\(m\.role\)/g)?.length, 2);
+});
+
 test("templates and work packages cannot be applied across companies", async () => {
   const source = await readFile(
     new URL("../routes/report-templates.ts", import.meta.url),
