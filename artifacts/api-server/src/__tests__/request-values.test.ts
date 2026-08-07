@@ -427,7 +427,7 @@ test("template items reject invalid billable quantities before any writes", () =
   }
 });
 
-test("copy-yesterday validates IDs and dates and writes atomically", async () => {
+test("copy-yesterday validates inputs and atomically replays duplicates", async () => {
   const source = await readFile(
     new URL("../routes/report-templates.ts", import.meta.url),
     "utf8",
@@ -435,6 +435,10 @@ test("copy-yesterday validates IDs and dates and writes atomically", async () =>
 
   assert.match(source, /const sourceId = parsePositiveId\(req\.params\.reportId\)/);
   assert.match(source, /const targetDate = parseDateOnly\(/);
-  assert.match(source, /const newReport = await db\.transaction\(async \(tx\)/);
+  assert.match(source, /const result = await db\.transaction\(async \(tx\)/);
+  assert.match(source, /dailyReportLockKey\(source\.companyId, foremanId, targetDate\)/);
+  assert.match(source, /pg_advisory_xact_lock\(hashtext\(\$\{lockKey\}\)\)/);
+  assert.match(source, /eq\(dailyReportsTable\.reportDate, targetDate\)/);
   assert.match(source, /await tx\.insert\(dailyReportsTable\)/);
+  assert.match(source, /res\.status\(result\.created \? 201 : 200\)/);
 });

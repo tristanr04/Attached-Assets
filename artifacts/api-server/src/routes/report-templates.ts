@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import {
   db, reportTemplatesTable, workPackageTemplatesTable, companyMembershipsTable,
   dailyReportsTable, timeEntriesTable, reportMaterialsTable, reportEquipmentTable,
@@ -8,7 +8,7 @@ import {
 } from "@workspace/db";
 import { requireAuth, type AuthenticatedRequest } from "../middlewares/requireAuth";
 import { parseDateOnly, parsePositiveId } from "../lib/requestValues";
-import { canAccessReport, canMutateReport } from "../lib/reportState";
+import { canAccessReport, canMutateReport, dailyReportLockKey } from "../lib/reportState";
 import { normalizeTemplateItems } from "../lib/templateItems";
 
 const router: IRouter = Router();
@@ -284,6 +284,8 @@ router.post("/reports/:reportId/copy", requireAuth, async (req: AuthenticatedReq
 
   const m = await checkAccess(req.clerkUserId, source.companyId, source.foremanId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
+  const foremanId = req.userId ?? m.userId;
+  if (!foremanId) { res.status(403).json({ error: "A linked user profile is required" }); return; }
 
   const [sourceEntries, sourceEquip, sourceMats] = await Promise.all([
     db.select().from(timeEntriesTable).where(eq(timeEntriesTable.reportId, sourceId)),
@@ -291,10 +293,25 @@ router.post("/reports/:reportId/copy", requireAuth, async (req: AuthenticatedReq
     db.select().from(reportMaterialsTable).where(eq(reportMaterialsTable.reportId, sourceId)),
   ]);
 
-  const newReport = await db.transaction(async (tx) => {
+  const result = await db.transaction(async (tx) => {
+    const lockKey = dailyReportLockKey(source.companyId, foremanId, targetDate);
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${lockKey}))`);
+
+    const [existing] = await tx.select().from(dailyReportsTable)
+      .where(and(
+        eq(dailyReportsTable.companyId, source.companyId),
+        eq(dailyReportsTable.foremanId, foremanId),
+        eq(dailyReportsTable.reportDate, targetDate),
+      ))
+      .orderBy(desc(dailyReportsTable.id))
+      .limit(1);
+    if (existing) {
+      return { report: existing, created: false };
+    }
+
     const [created] = await tx.insert(dailyReportsTable).values({
       companyId: source.companyId, projectId: source.projectId, crewId: source.crewId,
-      foremanId: req.userId ?? source.foremanId, reportDate: targetDate,
+      foremanId, reportDate: targetDate,
       status: "draft", workLocation: source.workLocation, generalForeman: source.generalForeman,
       startTime: source.startTime, weatherConditions: source.weatherConditions,
       workPerformed: source.workPerformed, safetyNotes: source.safetyNotes,
@@ -326,10 +343,17 @@ router.post("/reports/:reportId/copy", requireAuth, async (req: AuthenticatedReq
       });
     }
 
-    return created;
+    return { report: created, created: true };
   });
 
-  res.status(201).json({ id: newReport.id, reportDate: newReport.reportDate, status: newReport.status });
+  if (!result.created) {
+    res.setHeader("Idempotent-Replay", "true");
+  }
+  res.status(result.created ? 201 : 200).json({
+    id: result.report.id,
+    reportDate: result.report.reportDate,
+    status: result.report.status,
+  });
 });
 
 // ── Work Package Templates ─────────────────────────────────────────────────────
