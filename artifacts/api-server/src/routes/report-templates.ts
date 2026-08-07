@@ -7,7 +7,7 @@ import {
   catalogMaterialsTable, catalogEquipmentTable
 } from "@workspace/db";
 import { requireAuth, type AuthenticatedRequest } from "../middlewares/requireAuth";
-import { parsePositiveId } from "../lib/requestValues";
+import { parseDateOnly, parsePositiveId } from "../lib/requestValues";
 import { canMutateReport } from "../lib/reportState";
 import { normalizeTemplateItems } from "../lib/templateItems";
 
@@ -263,8 +263,12 @@ router.post("/report-templates/:id/apply", requireAuth, async (req: Authenticate
 // ── Copy report ───────────────────────────────────────────────────────────────
 router.post("/reports/:reportId/copy", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const sourceId = parseInt(req.params.reportId, 10);
-  const targetDate = req.body.reportDate ?? new Date().toISOString().split("T")[0];
+  const sourceId = parsePositiveId(req.params.reportId);
+  const targetDate = parseDateOnly(req.body.reportDate ?? new Date().toISOString().split("T")[0]);
+  if (sourceId === null || targetDate === null) {
+    res.status(400).json({ error: "Valid reportId and reportDate are required" });
+    return;
+  }
 
   const [source] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, sourceId));
   if (!source) { res.status(404).json({ error: "Not found" }); return; }
@@ -272,46 +276,49 @@ router.post("/reports/:reportId/copy", requireAuth, async (req: AuthenticatedReq
   const m = await checkAccess(req.clerkUserId, source.companyId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
 
-  // Create new independent draft (do NOT copy status, completedAt, id)
-  const [newReport] = await db.insert(dailyReportsTable).values({
-    companyId: source.companyId, projectId: source.projectId, crewId: source.crewId,
-    foremanId: req.userId ?? source.foremanId, reportDate: targetDate,
-    status: "draft", workLocation: source.workLocation, generalForeman: source.generalForeman,
-    startTime: source.startTime, weatherConditions: source.weatherConditions,
-    workPerformed: source.workPerformed, safetyNotes: source.safetyNotes,
-    additionalNotes: source.additionalNotes,
-  }).returning();
+  const [sourceEntries, sourceEquip, sourceMats] = await Promise.all([
+    db.select().from(timeEntriesTable).where(eq(timeEntriesTable.reportId, sourceId)),
+    db.select().from(reportEquipmentTable).where(eq(reportEquipmentTable.reportId, sourceId)),
+    db.select().from(reportMaterialsTable).where(eq(reportMaterialsTable.reportId, sourceId)),
+  ]);
 
-  // Copy time entries (reset hours to 0 — foreman fills in today's hours)
-  const sourceEntries = await db.select().from(timeEntriesTable).where(eq(timeEntriesTable.reportId, sourceId));
-  for (const e of sourceEntries) {
-    await db.insert(timeEntriesTable).values({
-      reportId: newReport.id, employeeName: e.employeeName, trade: e.trade,
-      crewMemberId: e.crewMemberId, laborClassificationId: e.laborClassificationId,
-      billingCode: e.billingCode,
-      regularHours: "0", overtimeHours: "0", doubleTimeHours: "0",
-      stormHours: "0", travelHours: "0", perDiemDays: "0",
-    });
-  }
+  const newReport = await db.transaction(async (tx) => {
+    const [created] = await tx.insert(dailyReportsTable).values({
+      companyId: source.companyId, projectId: source.projectId, crewId: source.crewId,
+      foremanId: req.userId ?? source.foremanId, reportDate: targetDate,
+      status: "draft", workLocation: source.workLocation, generalForeman: source.generalForeman,
+      startTime: source.startTime, weatherConditions: source.weatherConditions,
+      workPerformed: source.workPerformed, safetyNotes: source.safetyNotes,
+      additionalNotes: source.additionalNotes,
+    }).returning();
 
-  // Copy equipment (reset hours to 0)
-  const sourceEquip = await db.select().from(reportEquipmentTable).where(eq(reportEquipmentTable.reportId, sourceId));
-  for (const e of sourceEquip) {
-    await db.insert(reportEquipmentTable).values({
-      reportId: newReport.id, name: e.name, catalogEquipmentId: e.catalogEquipmentId,
-      unitId: e.unitId, billingCode: e.billingCode, quantity: e.quantity,
-      hoursUsed: "0", daysUsed: "0", standbyHours: "0",
-    });
-  }
+    for (const e of sourceEntries) {
+      await tx.insert(timeEntriesTable).values({
+        reportId: created.id, employeeName: e.employeeName, trade: e.trade,
+        crewMemberId: e.crewMemberId, laborClassificationId: e.laborClassificationId,
+        billingCode: e.billingCode,
+        regularHours: "0", overtimeHours: "0", doubleTimeHours: "0",
+        stormHours: "0", travelHours: "0", perDiemDays: "0",
+      });
+    }
 
-  // Copy materials (keep quantities as starting point)
-  const sourceMats = await db.select().from(reportMaterialsTable).where(eq(reportMaterialsTable.reportId, sourceId));
-  for (const mat of sourceMats) {
-    await db.insert(reportMaterialsTable).values({
-      reportId: newReport.id, name: mat.name, quantity: "0",
-      unit: mat.unit, catalogMaterialId: mat.catalogMaterialId,
-    });
-  }
+    for (const e of sourceEquip) {
+      await tx.insert(reportEquipmentTable).values({
+        reportId: created.id, name: e.name, catalogEquipmentId: e.catalogEquipmentId,
+        unitId: e.unitId, billingCode: e.billingCode, quantity: e.quantity,
+        hoursUsed: "0", daysUsed: "0", standbyHours: "0",
+      });
+    }
+
+    for (const mat of sourceMats) {
+      await tx.insert(reportMaterialsTable).values({
+        reportId: created.id, name: mat.name, quantity: "0",
+        unit: mat.unit, catalogMaterialId: mat.catalogMaterialId,
+      });
+    }
+
+    return created;
+  });
 
   res.status(201).json({ id: newReport.id, reportDate: newReport.reportDate, status: newReport.status });
 });

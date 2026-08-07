@@ -17,6 +17,24 @@ export function parsePositiveId(value: unknown): number | null {
   return Number.isSafeInteger(parsed) ? parsed : null;
 }
 
+export function parseDateOnly(value: unknown): string | null {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return null;
+  }
+
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return null;
+  }
+
+  return value;
+}
+
 export function selectCompanyMembership<
   T extends { companyId: number; role: string },
 >(

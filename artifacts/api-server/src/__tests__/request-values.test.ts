@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 
 import {
   parsePositiveId,
+  parseDateOnly,
   selectCompanyMembership,
 } from "../lib/requestValues";
 import { pickMutableReportFields } from "../lib/reportInput";
@@ -44,6 +45,14 @@ test("parsePositiveId rejects ambiguous, malformed, and unsafe values", () => {
     String(Number.MAX_SAFE_INTEGER + 1),
   ]) {
     assert.equal(parsePositiveId(value), null, `expected ${JSON.stringify(value)} to be rejected`);
+  }
+});
+
+test("parseDateOnly accepts real calendar dates and rejects rollover dates", () => {
+  assert.equal(parseDateOnly("2026-08-07"), "2026-08-07");
+  assert.equal(parseDateOnly("2024-02-29"), "2024-02-29");
+  for (const value of ["2026-02-29", "2026-13-01", "2026-00-10", "08/07/2026", ["2026-08-07"], null]) {
+    assert.equal(parseDateOnly(value), null);
   }
 });
 
@@ -295,11 +304,11 @@ test("template and work-package application are atomic and honor report locks", 
     "utf8",
   );
 
-  assert.equal(source.match(/await db\.transaction\(async \(tx\)/g)?.length, 2);
+  assert.equal(source.match(/await db\.transaction\(async \(tx\)/g)?.length, 3);
   assert.equal(source.match(/canMutateReport\(report\.status, m\.role\)/g)?.length, 2);
   assert.equal(
     source.match(/await tx\.insert\((?:timeEntriesTable|reportEquipmentTable|reportMaterialsTable)\)/g)?.length,
-    6,
+    9,
   );
 });
 
@@ -338,4 +347,16 @@ test("template items reject invalid billable quantities before any writes", () =
   ]) {
     assert.equal(invalid.valid, false);
   }
+});
+
+test("copy-yesterday validates IDs and dates and writes atomically", async () => {
+  const source = await readFile(
+    new URL("../routes/report-templates.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(source, /const sourceId = parsePositiveId\(req\.params\.reportId\)/);
+  assert.match(source, /const targetDate = parseDateOnly\(/);
+  assert.match(source, /const newReport = await db\.transaction\(async \(tx\)/);
+  assert.match(source, /await tx\.insert\(dailyReportsTable\)/);
 });
