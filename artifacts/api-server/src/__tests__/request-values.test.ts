@@ -22,6 +22,11 @@ import { parseDecimalInput, parseLaborHours } from "../lib/numericInput";
 import { normalizeTemplateItems } from "../lib/templateItems";
 import { applicationLockKey, parseIdempotencyKey } from "../lib/idempotency";
 import { canManageCrew } from "../lib/crewAccess";
+import {
+  normalizeBillableNumbers,
+  parseBillableCategory,
+  parseOptionalDate,
+} from "../lib/billableItemInput";
 
 test("parsePositiveId accepts only canonical positive integer strings", () => {
   assert.equal(parsePositiveId("1"), 1);
@@ -61,6 +66,56 @@ test("parseDateOnly accepts real calendar dates and rejects rollover dates", () 
   for (const value of ["2026-02-29", "2026-13-01", "2026-00-10", "08/07/2026", ["2026-08-07"], null]) {
     assert.equal(parseDateOnly(value), null);
   }
+});
+
+test("billable rates and quantities enforce database precision and non-negative values", () => {
+  assert.deepEqual(normalizeBillableNumbers({
+    baseRate: "125.5000",
+    overtimeRate: 188.25,
+    defaultQuantity: "3.125",
+  }), {
+    ok: true,
+    values: {
+      baseRate: "125.5000",
+      overtimeRate: "188.25",
+      defaultQuantity: "3.125",
+    },
+  });
+
+  for (const [field, value] of [
+    ["baseRate", -1],
+    ["baseRate", "1.00001"],
+    ["stormRate", Number.POSITIVE_INFINITY],
+    ["doubleTimeRate", "100000000"],
+    ["defaultQuantity", "1.0001"],
+    ["defaultQuantity", "10000000"],
+  ] as const) {
+    assert.deepEqual(normalizeBillableNumbers({ [field]: value }), { ok: false, field });
+  }
+});
+
+test("billable categories and effective dates reject malformed values", () => {
+  assert.equal(parseBillableCategory("labor"), "labor");
+  assert.equal(parseBillableCategory("unknown"), null);
+  assert.equal(parseBillableCategory(["labor"]), null);
+  assert.equal(parseOptionalDate("2026-08-07"), "2026-08-07");
+  assert.equal(parseOptionalDate("2026-02-29"), undefined);
+  assert.equal(parseOptionalDate(null), null);
+});
+
+test("billable item routes fail closed on IDs and protected billing inputs", async () => {
+  const source = await readFile(
+    new URL("../routes/billable-items.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.doesNotMatch(source, /parseInt\(/);
+  assert.equal(source.match(/normalizeBillableNumbers\(req\.body\)/g)?.length, 2);
+  assert.match(source, /parsePositiveId\(req\.query\.companyId\)/);
+  assert.equal(source.match(/parsePositiveId\(req\.params\.id\)/g)?.length, 2);
+  assert.match(source, /typeof req\.body\.taxable !== "boolean"/);
+  assert.match(source, /typeof req\.body\[f\] !== "boolean"/);
+  assert.equal(source.match(/expirationDate must not precede effectiveDate/g)?.length, 2);
 });
 
 test("templates and work packages cannot be applied across companies", async () => {
