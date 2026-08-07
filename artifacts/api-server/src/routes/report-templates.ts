@@ -3,7 +3,8 @@ import { eq, and, desc } from "drizzle-orm";
 import {
   db, reportTemplatesTable, workPackageTemplatesTable, companyMembershipsTable,
   dailyReportsTable, timeEntriesTable, reportMaterialsTable, reportEquipmentTable,
-  crewMembersTable
+  crewMembersTable, crewsTable, projectsTable, laborClassificationsTable,
+  catalogMaterialsTable, catalogEquipmentTable
 } from "@workspace/db";
 import { requireAuth, type AuthenticatedRequest } from "../middlewares/requireAuth";
 import { parsePositiveId } from "../lib/requestValues";
@@ -15,6 +16,87 @@ async function checkAccess(clerkUserId: string, companyId: number) {
   const [m] = await db.select().from(companyMembershipsTable)
     .where(and(eq(companyMembershipsTable.companyId, companyId), eq(companyMembershipsTable.clerkUserId, clerkUserId)));
   return m;
+}
+
+type CompanyReferenceKind =
+  | "crew"
+  | "project"
+  | "laborClassification"
+  | "catalogMaterial"
+  | "catalogEquipment";
+
+async function companyReferenceBelongs(
+  kind: CompanyReferenceKind,
+  value: unknown,
+  companyId: number,
+): Promise<boolean> {
+  if (value === undefined || value === null) {
+    return true;
+  }
+
+  const id = parsePositiveId(value);
+  if (id === null) {
+    return false;
+  }
+
+  if (kind === "crew") {
+    const [row] = await db.select({ id: crewsTable.id }).from(crewsTable)
+      .where(and(eq(crewsTable.id, id), eq(crewsTable.companyId, companyId)));
+    return Boolean(row);
+  }
+  if (kind === "project") {
+    const [row] = await db.select({ id: projectsTable.id }).from(projectsTable)
+      .where(and(eq(projectsTable.id, id), eq(projectsTable.companyId, companyId)));
+    return Boolean(row);
+  }
+  if (kind === "laborClassification") {
+    const [row] = await db.select({ id: laborClassificationsTable.id }).from(laborClassificationsTable)
+      .where(and(eq(laborClassificationsTable.id, id), eq(laborClassificationsTable.companyId, companyId)));
+    return Boolean(row);
+  }
+  if (kind === "catalogMaterial") {
+    const [row] = await db.select({ id: catalogMaterialsTable.id }).from(catalogMaterialsTable)
+      .where(and(eq(catalogMaterialsTable.id, id), eq(catalogMaterialsTable.companyId, companyId)));
+    return Boolean(row);
+  }
+
+  const [row] = await db.select({ id: catalogEquipmentTable.id }).from(catalogEquipmentTable)
+    .where(and(eq(catalogEquipmentTable.id, id), eq(catalogEquipmentTable.companyId, companyId)));
+  return Boolean(row);
+}
+
+async function validateApplicationReferences(
+  companyId: number,
+  values: {
+    defaultCrewId?: unknown;
+    defaultProjectId?: unknown;
+    laborItems: Array<Record<string, unknown>>;
+    equipmentItems: Array<Record<string, unknown>>;
+    materialItems: Array<Record<string, unknown>>;
+  },
+): Promise<string | null> {
+  if (!await companyReferenceBelongs("crew", values.defaultCrewId, companyId)) {
+    return "defaultCrewId must belong to the report company";
+  }
+  if (!await companyReferenceBelongs("project", values.defaultProjectId, companyId)) {
+    return "defaultProjectId must belong to the report company";
+  }
+  for (const item of values.laborItems) {
+    if (!await companyReferenceBelongs("laborClassification", item.laborClassificationId, companyId)) {
+      return "laborClassificationId must belong to the report company";
+    }
+  }
+  for (const item of values.equipmentItems) {
+    if (!await companyReferenceBelongs("catalogEquipment", item.catalogEquipmentId, companyId)) {
+      return "catalogEquipmentId must belong to the report company";
+    }
+  }
+  for (const item of values.materialItems) {
+    if (!await companyReferenceBelongs("catalogMaterial", item.catalogMaterialId, companyId)) {
+      return "catalogMaterialId must belong to the report company";
+    }
+  }
+  return null;
 }
 
 function fmtTemplate(t: typeof reportTemplatesTable.$inferSelect) {
@@ -123,6 +205,14 @@ router.post("/report-templates/:id/apply", requireAuth, async (req: Authenticate
   const laborItems = Array.isArray(template.laborItems) ? template.laborItems as Array<Record<string, unknown>> : [];
   const equipmentItems = Array.isArray(template.equipmentItems) ? template.equipmentItems as Array<Record<string, unknown>> : [];
   const materialItems = Array.isArray(template.materialItems) ? template.materialItems as Array<Record<string, unknown>> : [];
+  const referenceError = await validateApplicationReferences(template.companyId, {
+    defaultCrewId: reportUpdates.crewId,
+    defaultProjectId: reportUpdates.projectId,
+    laborItems,
+    equipmentItems,
+    materialItems,
+  });
+  if (referenceError) { res.status(400).json({ error: referenceError }); return; }
 
   await db.transaction(async (tx) => {
     if (Object.keys(reportUpdates).length > 0) {
@@ -312,6 +402,12 @@ router.post("/work-package-templates/:id/apply", requireAuth, async (req: Authen
   const laborItems = Array.isArray(wp.laborItems) ? wp.laborItems as Array<Record<string, unknown>> : [];
   const equipmentItems = Array.isArray(wp.equipmentItems) ? wp.equipmentItems as Array<Record<string, unknown>> : [];
   const materialItems = Array.isArray(wp.materialItems) ? wp.materialItems as Array<Record<string, unknown>> : [];
+  const referenceError = await validateApplicationReferences(wp.companyId, {
+    laborItems,
+    equipmentItems,
+    materialItems,
+  });
+  if (referenceError) { res.status(400).json({ error: referenceError }); return; }
 
   await db.transaction(async (tx) => {
     for (const item of laborItems) {

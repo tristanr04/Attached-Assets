@@ -301,3 +301,21 @@ test("template and work-package application are atomic and honor report locks", 
     6,
   );
 });
+
+test("template application cannot bypass company-scoped reference checks", async () => {
+  const source = await readFile(
+    new URL("../routes/report-templates.ts", import.meta.url),
+    "utf8",
+  );
+
+  for (const table of [
+    "crewsTable",
+    "projectsTable",
+    "laborClassificationsTable",
+    "catalogMaterialsTable",
+    "catalogEquipmentTable",
+  ]) {
+    assert.match(source, new RegExp(`eq\\(${table}\\.companyId, companyId\\)`));
+  }
+  assert.equal(source.match(/validateApplicationReferences\(/g)?.length, 3);
+});
