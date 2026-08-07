@@ -1,5 +1,19 @@
 export type ReportMutationRole = "admin" | "supervisor" | "foreman" | string;
 
+export function canAccessReport(
+  role: ReportMutationRole,
+  membershipUserId: number | null,
+  reportForemanId: number | null,
+): boolean {
+  if (role === "admin" || role === "supervisor") {
+    return true;
+  }
+
+  return role === "foreman"
+    && membershipUserId !== null
+    && reportForemanId === membershipUserId;
+}
+
 export function canMutateReport(
   status: string,
   role: ReportMutationRole,

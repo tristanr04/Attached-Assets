@@ -12,7 +12,7 @@ import {
   validatePhotoDataUrl,
   validateSignatureDataUrl,
 } from "../lib/photoDataUrl";
-import { canMutateReport, completionUpdate } from "../lib/reportState";
+import { canAccessReport, canMutateReport, completionUpdate } from "../lib/reportState";
 import { parseDecimalInput, parseLaborHours } from "../lib/numericInput";
 import { normalizeTemplateItems } from "../lib/templateItems";
 
@@ -227,6 +227,36 @@ test("completed reports are locked for foremen but remain amendable by reviewers
   assert.equal(canMutateReport("complete", "foreman"), false);
   assert.equal(canMutateReport("complete", "supervisor"), true);
   assert.equal(canMutateReport("complete", "admin"), true);
+});
+
+test("foremen can access only their own reports while reviewers retain company access", () => {
+  assert.equal(canAccessReport("foreman", 10, 10), true);
+  assert.equal(canAccessReport("foreman", 10, 11), false);
+  assert.equal(canAccessReport("foreman", 10, null), false);
+  assert.equal(canAccessReport("foreman", null, 10), false);
+  assert.equal(canAccessReport("supervisor", 10, 11), true);
+  assert.equal(canAccessReport("admin", 10, 11), true);
+  assert.equal(canAccessReport("unknown", 10, 10), false);
+});
+
+test("report and template routes enforce foreman ownership", async () => {
+  const reportRoutes = await readFile(
+    new URL("../routes/reports.ts", import.meta.url),
+    "utf8",
+  );
+  const templateRoutes = await readFile(
+    new URL("../routes/report-templates.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.equal(
+    reportRoutes.match(/checkAccess\(req\.clerkUserId, report\.companyId, report\.foremanId\)/g)?.length,
+    21,
+  );
+  assert.match(reportRoutes, /canAccessReport\(membership\.role, membership\.userId, report\.foremanId\)/);
+  assert.match(templateRoutes, /checkAccess\(req\.clerkUserId, template\.companyId, report\.foremanId\)/);
+  assert.match(templateRoutes, /checkAccess\(req\.clerkUserId, source\.companyId, source\.foremanId\)/);
+  assert.match(templateRoutes, /checkAccess\(req\.clerkUserId, wp\.companyId, report\.foremanId\)/);
 });
 
 test("report completion is idempotent and preserves the first completion time", () => {

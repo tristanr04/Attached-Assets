@@ -13,14 +13,21 @@ import {
   validateSignatureDataUrl,
 } from "../lib/photoDataUrl";
 import { parsePositiveId } from "../lib/requestValues";
-import { canMutateReport, completionUpdate } from "../lib/reportState";
+import { canAccessReport, canMutateReport, completionUpdate } from "../lib/reportState";
 import { parseDecimalInput, parseLaborHours } from "../lib/numericInput";
 
 const router: IRouter = Router();
 
-async function checkAccess(clerkUserId: string, companyId: number) {
+async function checkAccess(
+  clerkUserId: string,
+  companyId: number,
+  reportForemanId?: number | null,
+) {
   const [m] = await db.select().from(companyMembershipsTable)
     .where(and(eq(companyMembershipsTable.companyId, companyId), eq(companyMembershipsTable.clerkUserId, clerkUserId)));
+  if (m && reportForemanId !== undefined && !canAccessReport(m.role, m.userId, reportForemanId)) {
+    return undefined;
+  }
   return m;
 }
 
@@ -196,8 +203,10 @@ router.get("/reports", requireAuth, async (req: AuthenticatedRequest, res): Prom
 
   let reports = await db.select().from(dailyReportsTable).orderBy(desc(dailyReportsTable.reportDate));
 
-  const allowedCompanyIds = memberships.map(m => m.companyId);
-  reports = reports.filter(r => allowedCompanyIds.includes(r.companyId));
+  reports = reports.filter((report) => {
+    const membership = memberships.find((candidate) => candidate.companyId === report.companyId);
+    return Boolean(membership && canAccessReport(membership.role, membership.userId, report.foremanId));
+  });
 
   if (cqId) reports = reports.filter(r => r.companyId === parseInt(cqId as string, 10));
   if (crqId) reports = reports.filter(r => r.crewId === parseInt(crqId as string, 10));
@@ -241,7 +250,7 @@ router.get("/reports/:reportId", requireAuth, async (req: AuthenticatedRequest, 
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
 
-  const m = await checkAccess(req.clerkUserId, report.companyId);
+  const m = await checkAccess(req.clerkUserId, report.companyId, report.foremanId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
 
   const [timeEntries, materials, equipment, photos, sigs] = await Promise.all([
@@ -271,7 +280,7 @@ router.patch("/reports/:reportId", requireAuth, async (req: AuthenticatedRequest
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
 
-  const m = await checkAccess(req.clerkUserId, report.companyId);
+  const m = await checkAccess(req.clerkUserId, report.companyId, report.foremanId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
   if (rejectLockedReport(report, m.role, res)) { return; }
 
@@ -291,7 +300,7 @@ router.delete("/reports/:reportId", requireAuth, async (req: AuthenticatedReques
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
 
-  const m = await checkAccess(req.clerkUserId, report.companyId);
+  const m = await checkAccess(req.clerkUserId, report.companyId, report.foremanId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
   if (report.status !== "draft") { res.status(400).json({ error: "Only draft reports can be deleted" }); return; }
 
@@ -307,7 +316,7 @@ router.post("/reports/:reportId/complete", requireAuth, async (req: Authenticate
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
 
-  const m = await checkAccess(req.clerkUserId, report.companyId);
+  const m = await checkAccess(req.clerkUserId, report.companyId, report.foremanId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
 
   const update = completionUpdate(report.status, report.completedAt, new Date());
@@ -338,7 +347,7 @@ router.get("/reports/:reportId/time-entries", requireAuth, async (req: Authentic
   const reportId = parseInt(req.params.reportId, 10);
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
-  const m = await checkAccess(req.clerkUserId, report.companyId);
+  const m = await checkAccess(req.clerkUserId, report.companyId, report.foremanId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
   const entries = await db.select().from(timeEntriesTable).where(eq(timeEntriesTable.reportId, reportId));
   res.json(entries.map(formatTimeEntry));
@@ -349,7 +358,7 @@ router.post("/reports/:reportId/time-entries", requireAuth, async (req: Authenti
   const reportId = parseInt(req.params.reportId, 10);
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
-  const m = await checkAccess(req.clerkUserId, report.companyId);
+  const m = await checkAccess(req.clerkUserId, report.companyId, report.foremanId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
   if (rejectLockedReport(report, m.role, res)) { return; }
 
@@ -388,7 +397,7 @@ router.patch("/reports/:reportId/time-entries/:entryId", requireAuth, async (req
   const entryId = parseInt(req.params.entryId, 10);
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
-  const m = await checkAccess(req.clerkUserId, report.companyId);
+  const m = await checkAccess(req.clerkUserId, report.companyId, report.foremanId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
   if (rejectLockedReport(report, m.role, res)) { return; }
 
@@ -424,7 +433,7 @@ router.delete("/reports/:reportId/time-entries/:entryId", requireAuth, async (re
   const entryId = parseInt(req.params.entryId, 10);
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
-  const m = await checkAccess(req.clerkUserId, report.companyId);
+  const m = await checkAccess(req.clerkUserId, report.companyId, report.foremanId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
   if (rejectLockedReport(report, m.role, res)) { return; }
   await db.delete(timeEntriesTable).where(and(eq(timeEntriesTable.id, entryId), eq(timeEntriesTable.reportId, reportId)));
@@ -437,7 +446,7 @@ router.get("/reports/:reportId/materials", requireAuth, async (req: Authenticate
   const reportId = parseInt(req.params.reportId, 10);
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
-  const m = await checkAccess(req.clerkUserId, report.companyId);
+  const m = await checkAccess(req.clerkUserId, report.companyId, report.foremanId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
   const materials = await db.select().from(reportMaterialsTable).where(eq(reportMaterialsTable.reportId, reportId));
   res.json(materials.map(formatMaterial));
@@ -448,7 +457,7 @@ router.post("/reports/:reportId/materials", requireAuth, async (req: Authenticat
   const reportId = parseInt(req.params.reportId, 10);
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
-  const m = await checkAccess(req.clerkUserId, report.companyId);
+  const m = await checkAccess(req.clerkUserId, report.companyId, report.foremanId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
   if (rejectLockedReport(report, m.role, res)) { return; }
   const { name, quantity, unit, notes, catalogMaterialId } = req.body;
@@ -482,7 +491,7 @@ router.patch("/reports/:reportId/materials/:materialId", requireAuth, async (req
   const materialId = parseInt(req.params.materialId, 10);
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
-  const m = await checkAccess(req.clerkUserId, report.companyId);
+  const m = await checkAccess(req.clerkUserId, report.companyId, report.foremanId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
   if (rejectLockedReport(report, m.role, res)) { return; }
   const { name, quantity, unit, notes } = req.body;
@@ -515,7 +524,7 @@ router.delete("/reports/:reportId/materials/:materialId", requireAuth, async (re
   const materialId = parseInt(req.params.materialId, 10);
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
-  const m = await checkAccess(req.clerkUserId, report.companyId);
+  const m = await checkAccess(req.clerkUserId, report.companyId, report.foremanId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
   if (rejectLockedReport(report, m.role, res)) { return; }
   await db.delete(reportMaterialsTable).where(and(eq(reportMaterialsTable.id, materialId), eq(reportMaterialsTable.reportId, reportId)));
@@ -528,7 +537,7 @@ router.get("/reports/:reportId/equipment", requireAuth, async (req: Authenticate
   const reportId = parseInt(req.params.reportId, 10);
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
-  const m = await checkAccess(req.clerkUserId, report.companyId);
+  const m = await checkAccess(req.clerkUserId, report.companyId, report.foremanId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
   const eq_ = await db.select().from(reportEquipmentTable).where(eq(reportEquipmentTable.reportId, reportId));
   res.json(eq_.map(formatEquipment));
@@ -539,7 +548,7 @@ router.post("/reports/:reportId/equipment", requireAuth, async (req: Authenticat
   const reportId = parseInt(req.params.reportId, 10);
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
-  const m = await checkAccess(req.clerkUserId, report.companyId);
+  const m = await checkAccess(req.clerkUserId, report.companyId, report.foremanId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
   if (rejectLockedReport(report, m.role, res)) { return; }
   const { name, hoursUsed, notes, unitId, catalogEquipmentId } = req.body;
@@ -575,7 +584,7 @@ router.patch("/reports/:reportId/equipment/:equipmentId", requireAuth, async (re
   const equipmentId = parseInt(req.params.equipmentId, 10);
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
-  const m = await checkAccess(req.clerkUserId, report.companyId);
+  const m = await checkAccess(req.clerkUserId, report.companyId, report.foremanId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
   if (rejectLockedReport(report, m.role, res)) { return; }
   const { name, hoursUsed, notes, unitId } = req.body;
@@ -607,7 +616,7 @@ router.delete("/reports/:reportId/equipment/:equipmentId", requireAuth, async (r
   const equipmentId = parseInt(req.params.equipmentId, 10);
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
-  const m = await checkAccess(req.clerkUserId, report.companyId);
+  const m = await checkAccess(req.clerkUserId, report.companyId, report.foremanId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
   if (rejectLockedReport(report, m.role, res)) { return; }
   await db.delete(reportEquipmentTable).where(and(eq(reportEquipmentTable.id, equipmentId), eq(reportEquipmentTable.reportId, reportId)));
@@ -620,7 +629,7 @@ router.get("/reports/:reportId/photos", requireAuth, async (req: AuthenticatedRe
   const reportId = parseInt(req.params.reportId, 10);
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
-  const m = await checkAccess(req.clerkUserId, report.companyId);
+  const m = await checkAccess(req.clerkUserId, report.companyId, report.foremanId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
   const photos = await db.select().from(photosTable).where(eq(photosTable.reportId, reportId));
   res.json(photos.map(formatPhoto));
@@ -631,7 +640,7 @@ router.post("/reports/:reportId/photos", requireAuth, async (req: AuthenticatedR
   const reportId = parseInt(req.params.reportId, 10);
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
-  const m = await checkAccess(req.clerkUserId, report.companyId);
+  const m = await checkAccess(req.clerkUserId, report.companyId, report.foremanId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
   if (rejectLockedReport(report, m.role, res)) { return; }
   const { dataUrl, caption, category } = req.body;
@@ -656,7 +665,7 @@ router.patch("/reports/:reportId/photos/:photoId", requireAuth, async (req: Auth
   const photoId = parseInt(req.params.photoId, 10);
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
-  const m = await checkAccess(req.clerkUserId, report.companyId);
+  const m = await checkAccess(req.clerkUserId, report.companyId, report.foremanId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
   if (rejectLockedReport(report, m.role, res)) { return; }
   const { caption, category } = req.body;
@@ -675,7 +684,7 @@ router.delete("/reports/:reportId/photos/:photoId", requireAuth, async (req: Aut
   const photoId = parseInt(req.params.photoId, 10);
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
-  const m = await checkAccess(req.clerkUserId, report.companyId);
+  const m = await checkAccess(req.clerkUserId, report.companyId, report.foremanId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
   if (rejectLockedReport(report, m.role, res)) { return; }
   const [deleted] = await db.delete(photosTable).where(and(eq(photosTable.id, photoId), eq(photosTable.reportId, reportId))).returning();
@@ -689,7 +698,7 @@ router.post("/reports/:reportId/signature", requireAuth, async (req: Authenticat
   const reportId = parseInt(req.params.reportId, 10);
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
-  const m = await checkAccess(req.clerkUserId, report.companyId);
+  const m = await checkAccess(req.clerkUserId, report.companyId, report.foremanId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
   if (rejectLockedReport(report, m.role, res)) { return; }
   const { dataUrl } = req.body;

@@ -8,14 +8,21 @@ import {
 } from "@workspace/db";
 import { requireAuth, type AuthenticatedRequest } from "../middlewares/requireAuth";
 import { parseDateOnly, parsePositiveId } from "../lib/requestValues";
-import { canMutateReport } from "../lib/reportState";
+import { canAccessReport, canMutateReport } from "../lib/reportState";
 import { normalizeTemplateItems } from "../lib/templateItems";
 
 const router: IRouter = Router();
 
-async function checkAccess(clerkUserId: string, companyId: number) {
+async function checkAccess(
+  clerkUserId: string,
+  companyId: number,
+  reportForemanId?: number | null,
+) {
   const [m] = await db.select().from(companyMembershipsTable)
     .where(and(eq(companyMembershipsTable.companyId, companyId), eq(companyMembershipsTable.clerkUserId, clerkUserId)));
+  if (m && reportForemanId !== undefined && !canAccessReport(m.role, m.userId, reportForemanId)) {
+    return undefined;
+  }
   return m;
 }
 
@@ -187,7 +194,7 @@ router.post("/report-templates/:id/apply", requireAuth, async (req: Authenticate
     return;
   }
 
-  const m = await checkAccess(req.clerkUserId, template.companyId);
+  const m = await checkAccess(req.clerkUserId, template.companyId, report.foremanId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
   if (!canMutateReport(report.status, m.role)) {
     res.status(403).json({ error: "Cannot apply a template to a completed report" });
@@ -273,7 +280,7 @@ router.post("/reports/:reportId/copy", requireAuth, async (req: AuthenticatedReq
   const [source] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, sourceId));
   if (!source) { res.status(404).json({ error: "Not found" }); return; }
 
-  const m = await checkAccess(req.clerkUserId, source.companyId);
+  const m = await checkAccess(req.clerkUserId, source.companyId, source.foremanId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
 
   const [sourceEntries, sourceEquip, sourceMats] = await Promise.all([
@@ -405,7 +412,7 @@ router.post("/work-package-templates/:id/apply", requireAuth, async (req: Authen
     return;
   }
 
-  const m = await checkAccess(req.clerkUserId, wp.companyId);
+  const m = await checkAccess(req.clerkUserId, wp.companyId, report.foremanId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
   if (!canMutateReport(report.status, m.role)) {
     res.status(403).json({ error: "Cannot apply a work package to a completed report" });
