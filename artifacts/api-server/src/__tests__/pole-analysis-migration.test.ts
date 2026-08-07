@@ -9,7 +9,7 @@ const schemaUrl = new URL("../../../../lib/db/src/schema/pole-analysis.ts", impo
 test("pole analysis migration is additive and repeat-safe", async () => {
   const source = await readFile(migrationUrl, "utf8");
   assert.equal(source.match(/CREATE TABLE IF NOT EXISTS/g)?.length, 7);
-  assert.equal(source.match(/CREATE UNIQUE INDEX IF NOT EXISTS/g)?.length, 13);
+  assert.equal(source.match(/CREATE UNIQUE INDEX IF NOT EXISTS/g)?.length, 14);
   assert.doesNotMatch(source, /ALTER TABLE|TRUNCATE|DELETE FROM|DROP TABLE/i);
   assert.match(source, /BEGIN;/);
   assert.match(source, /COMMIT;/);
@@ -22,6 +22,8 @@ test("pole persistence enforces company scope, immutable evidence, versions, and
   assert.match(source, /pole_reference_photos\(company_id, image_sha256\)/);
   assert.match(source, /pole_analysis_runs\(photo_id, version\)/);
   assert.match(source, /pole_analysis_runs\(company_id, idempotency_key\)/);
+  assert.match(source, /pole_analysis_runs\(company_id, confirmation_idempotency_key\)/);
+  assert.match(source, /confirmed_by_user_id integer REFERENCES users\(id\)/);
   assert.match(source, /pole_analysis_decisions\(analysis_run_id, field_key\)/);
   assert.match(source, /REFERENCES photos\(id\)(?! ON DELETE CASCADE)/);
   assert.match(source, /FOREIGN KEY \(company_id, pole_profile_id\) REFERENCES pole_profiles\(company_id, id\)/);
@@ -40,6 +42,7 @@ test("database schema mirrors migration constraints and exports all pole tables"
     "poleAnalysisDecisionsTable",
   ]) assert.match(source, new RegExp(`export const ${table}`));
   assert.match(source, /companyId, table\.idempotencyKey/);
+  assert.match(source, /companyId, table\.confirmationIdempotencyKey/);
   assert.match(source, /table\.photoId, table\.version/);
   assert.match(source, /table\.analysisRunId, table\.fieldKey/);
   assert.equal(source.match(/columns: \[table\.companyId, table\.poleProfileId\]/g)?.length, 2);

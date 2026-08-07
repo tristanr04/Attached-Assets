@@ -68,12 +68,15 @@ CREATE TABLE IF NOT EXISTS pole_analysis_runs (
   target_evidence jsonb NOT NULL DEFAULT '[]'::jsonb,
   limitations jsonb NOT NULL DEFAULT '[]'::jsonb,
   idempotency_key text NOT NULL,
+  confirmation_idempotency_key text,
+  confirmed_by_user_id integer REFERENCES users(id),
   created_at timestamptz NOT NULL DEFAULT now(),
   confirmed_at timestamptz,
   CONSTRAINT pole_analysis_runs_company_profile_fk FOREIGN KEY (company_id, selected_pole_profile_id) REFERENCES pole_profiles(company_id, id)
 );
 CREATE UNIQUE INDEX IF NOT EXISTS pole_analysis_runs_photo_version_uq ON pole_analysis_runs(photo_id, version);
 CREATE UNIQUE INDEX IF NOT EXISTS pole_analysis_runs_company_idempotency_uq ON pole_analysis_runs(company_id, idempotency_key);
+CREATE UNIQUE INDEX IF NOT EXISTS pole_analysis_runs_company_confirmation_idempotency_uq ON pole_analysis_runs(company_id, confirmation_idempotency_key) WHERE confirmation_idempotency_key IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS pole_analysis_runs_company_analysis_key_version_uq ON pole_analysis_runs(company_id, analysis_key, version);
 CREATE UNIQUE INDEX IF NOT EXISTS pole_analysis_runs_company_id_uq ON pole_analysis_runs(company_id, id);
 

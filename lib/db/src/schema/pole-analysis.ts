@@ -97,11 +97,16 @@ export const poleAnalysisRunsTable = pgTable("pole_analysis_runs", {
   targetEvidence: jsonb("target_evidence").notNull().default(sql`'[]'::jsonb`),
   limitations: jsonb("limitations").notNull().default(sql`'[]'::jsonb`),
   idempotencyKey: text("idempotency_key").notNull(),
+  confirmationIdempotencyKey: text("confirmation_idempotency_key"),
+  confirmedByUserId: integer("confirmed_by_user_id").references(() => usersTable.id),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
 }, table => [
   uniqueIndex("pole_analysis_runs_photo_version_uq").on(table.photoId, table.version),
   uniqueIndex("pole_analysis_runs_company_idempotency_uq").on(table.companyId, table.idempotencyKey),
+  uniqueIndex("pole_analysis_runs_company_confirmation_idempotency_uq")
+    .on(table.companyId, table.confirmationIdempotencyKey)
+    .where(sql`${table.confirmationIdempotencyKey} is not null`),
   uniqueIndex("pole_analysis_runs_company_analysis_key_version_uq").on(table.companyId, table.analysisKey, table.version),
   uniqueIndex("pole_analysis_runs_company_id_uq").on(table.companyId, table.id),
   foreignKey({

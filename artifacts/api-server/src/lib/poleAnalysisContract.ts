@@ -93,6 +93,12 @@ export interface ForemanFieldDecision {
 const FIELD_SET = new Set<string>(POLE_ANALYSIS_FIELDS);
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/;
 
+export interface PoleAnalysisConfirmationRequest {
+  expectedVersion: number;
+  idempotencyKey: string;
+  decisions: ForemanFieldDecision[];
+}
+
 function isPositiveId(value: unknown): value is number {
   return Number.isSafeInteger(value) && Number(value) > 0;
 }
@@ -109,6 +115,51 @@ function isSafeJson(value: unknown, depth = 0): value is JsonValue {
   if (typeof value !== "object") return false;
   const entries = Object.entries(value);
   return entries.length <= 100 && entries.every(([key, item]) => key.length <= 100 && isSafeJson(item, depth + 1));
+}
+
+export function parsePoleAnalysisConfirmationRequest(
+  body: unknown,
+  idempotencyKey: unknown,
+): PoleAnalysisConfirmationRequest {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    throw new Error("A confirmation request body is required");
+  }
+  const input = body as Record<string, unknown>;
+  if (!isPositiveId(input.expectedVersion)) throw new Error("expectedVersion must be a positive integer");
+  if (typeof idempotencyKey !== "string" || !SAFE_ID.test(idempotencyKey)) {
+    throw new Error("A valid Idempotency-Key header is required");
+  }
+  if (!Array.isArray(input.decisions) || input.decisions.length === 0 || input.decisions.length > POLE_ANALYSIS_FIELDS.length) {
+    throw new Error("decisions must contain one entry per proposed field");
+  }
+
+  const seen = new Set<string>();
+  const decisions = input.decisions.map((value): ForemanFieldDecision => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Each decision must be an object");
+    const decision = value as Record<string, unknown>;
+    if (typeof decision.fieldKey !== "string" || !FIELD_SET.has(decision.fieldKey)) {
+      throw new Error(`Unsupported decision field: ${String(decision.fieldKey)}`);
+    }
+    if (seen.has(decision.fieldKey)) throw new Error(`Duplicate decision for ${decision.fieldKey}`);
+    seen.add(decision.fieldKey);
+    if (decision.action !== "accept" && decision.action !== "edit" && decision.action !== "reject") {
+      throw new Error(`Invalid decision action for ${decision.fieldKey}`);
+    }
+    if (decision.action === "edit" && !isSafeJson(decision.editedValue)) {
+      throw new Error(`Edited value required for ${decision.fieldKey}`);
+    }
+    if (decision.note !== undefined && (typeof decision.note !== "string" || decision.note.length > 1_000)) {
+      throw new Error(`Invalid decision note for ${decision.fieldKey}`);
+    }
+    return {
+      fieldKey: decision.fieldKey as PoleAnalysisFieldKey,
+      action: decision.action,
+      ...(decision.action === "edit" ? { editedValue: decision.editedValue as JsonValue } : {}),
+      ...(typeof decision.note === "string" ? { note: decision.note } : {}),
+    };
+  });
+
+  return { expectedVersion: input.expectedVersion, idempotencyKey, decisions };
 }
 
 function validateEvidence(

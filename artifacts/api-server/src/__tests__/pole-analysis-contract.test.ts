@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   confirmPoleAnalysis,
+  parsePoleAnalysisConfirmationRequest,
   scorePoleAnalysisFixture,
   validatePoleAnalysisProposal,
   type PoleAnalysisContext,
@@ -106,6 +107,38 @@ test("foreman confirmation requires accept, edit, or reject for every proposal",
     idempotencyKey: "confirm:fixture-001",
     confirmedAt: "2026-08-07T13:00:00.000Z",
   }), /decision required for poleMaterial/);
+});
+
+test("confirmation requests require a bounded retry key and valid field decisions", () => {
+  assert.deepEqual(parsePoleAnalysisConfirmationRequest({
+    expectedVersion: 1,
+    decisions: [
+      { fieldKey: "poleNumber", action: "accept" },
+      { fieldKey: "poleMaterial", action: "edit", editedValue: "steel" },
+    ],
+  }, "confirm:fixture-001"), {
+    expectedVersion: 1,
+    idempotencyKey: "confirm:fixture-001",
+    decisions: [
+      { fieldKey: "poleNumber", action: "accept" },
+      { fieldKey: "poleMaterial", action: "edit", editedValue: "steel" },
+    ],
+  });
+  assert.throws(() => parsePoleAnalysisConfirmationRequest({
+    expectedVersion: 1,
+    decisions: [{ fieldKey: "poleNumber", action: "accept" }],
+  }, "short"), /Idempotency-Key/);
+  assert.throws(() => parsePoleAnalysisConfirmationRequest({
+    expectedVersion: 1,
+    decisions: [
+      { fieldKey: "poleNumber", action: "accept" },
+      { fieldKey: "poleNumber", action: "reject" },
+    ],
+  }, "confirm:fixture-001"), /Duplicate decision/);
+  assert.throws(() => parsePoleAnalysisConfirmationRequest({
+    expectedVersion: 1,
+    decisions: [{ fieldKey: "billingRate", action: "accept" }],
+  }, "confirm:fixture-001"), /Unsupported decision field/);
 });
 
 test("confirmed output preserves the original proposal and foreman corrections immutably", () => {
