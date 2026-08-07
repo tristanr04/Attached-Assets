@@ -1,10 +1,11 @@
 import { Router, type IRouter, type Response } from "express";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import {
   db, dailyReportsTable, companyMembershipsTable, usersTable,
   projectsTable, crewsTable, crewMembersTable, timeEntriesTable,
   catalogMaterialsTable, reportMaterialsTable, catalogEquipmentTable,
-  reportEquipmentTable, photosTable, signaturesTable, poleAnalysisRunsTable
+  reportEquipmentTable, photosTable, signaturesTable, poleAnalysisJobsTable,
+  poleAnalysisRunsTable
 } from "@workspace/db";
 import { requireAuth, type AuthenticatedRequest } from "../middlewares/requireAuth";
 import { pickMutableReportFields } from "../lib/reportInput";
@@ -20,6 +21,7 @@ import {
   dailyReportLockKey,
 } from "../lib/reportState";
 import { parseDecimalInput, parseLaborHours } from "../lib/numericInput";
+import { parseIdempotencyKey, photoUploadLockKey } from "../lib/idempotency";
 
 const router: IRouter = Router();
 
@@ -394,7 +396,15 @@ router.post("/reports/:reportId/complete", requireAuth, async (req: Authenticate
         eq(poleAnalysisRunsTable.status, "ai_proposed"),
       ))
       .limit(1);
-    if (pendingAnalysis) {
+    const [pendingAnalysisJob] = await tx.select({ id: poleAnalysisJobsTable.id })
+      .from(poleAnalysisJobsTable)
+      .where(and(
+        eq(poleAnalysisJobsTable.companyId, current.companyId),
+        eq(poleAnalysisJobsTable.reportId, reportId),
+        inArray(poleAnalysisJobsTable.status, ["queued", "processing", "retry_wait"]),
+      ))
+      .limit(1);
+    if (pendingAnalysis || pendingAnalysisJob) {
       return {
         code: 409 as const,
         error: "Review and confirm or reject the pending pole analysis before submitting this report",
@@ -737,6 +747,8 @@ router.post("/reports/:reportId/photos", requireAuth, async (req: AuthenticatedR
   const m = await checkAccess(req.clerkUserId, report.companyId, report.foremanId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
   if (rejectLockedReport(report, m.role, res)) { return; }
+  const idempotencyKey = parseIdempotencyKey(req.get("Idempotency-Key"));
+  if (!idempotencyKey) { res.status(400).json({ error: "A valid Idempotency-Key is required" }); return; }
   const { dataUrl, caption, category } = req.body;
   if (!dataUrl) { res.status(400).json({ error: "dataUrl is required" }); return; }
   const photoValidation = validatePhotoDataUrl(dataUrl);
@@ -744,13 +756,55 @@ router.post("/reports/:reportId/photos", requireAuth, async (req: AuthenticatedR
     res.status(400).json({ error: photoValidation.error });
     return;
   }
-  const [photo] = await db.insert(photosTable).values({
-    reportId,
-    url: dataUrl,
-    caption: caption ?? null,
-    category: category ?? "other",
-  }).returning();
-  res.status(201).json(formatPhoto(photo));
+  const result = await db.transaction(async (tx) => {
+    const lockKey = photoUploadLockKey(report.companyId, idempotencyKey);
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${lockKey}))`);
+
+    const [existingJob] = await tx.select().from(poleAnalysisJobsTable).where(and(
+      eq(poleAnalysisJobsTable.companyId, report.companyId),
+      eq(poleAnalysisJobsTable.requestKey, idempotencyKey),
+    ));
+    if (existingJob) {
+      if (existingJob.reportId !== reportId) return { kind: "conflict" as const };
+      const [existingPhoto] = await tx.select().from(photosTable).where(and(
+        eq(photosTable.id, existingJob.photoId),
+        eq(photosTable.reportId, reportId),
+      ));
+      return existingPhoto
+        ? { kind: "replay" as const, photo: existingPhoto }
+        : { kind: "conflict" as const };
+    }
+
+    await tx.execute(sql`select id from daily_reports where id = ${reportId} for update`);
+    const [current] = await tx.select().from(dailyReportsTable).where(and(
+      eq(dailyReportsTable.id, reportId),
+      eq(dailyReportsTable.companyId, report.companyId),
+    ));
+    if (!current || current.status === "complete" || !canMutateReport(current.status, m.role)) {
+      return { kind: "locked" as const };
+    }
+
+    const [photo] = await tx.insert(photosTable).values({
+      reportId,
+      url: dataUrl,
+      caption: caption ?? null,
+      category: category ?? "other",
+    }).returning();
+    await tx.insert(poleAnalysisJobsTable).values({
+      companyId: report.companyId,
+      reportId,
+      photoId: photo.id,
+      requestKey: idempotencyKey,
+      generation: 1,
+      status: "queued",
+    });
+    return { kind: "created" as const, photo };
+  });
+
+  if (result.kind === "conflict") { res.status(409).json({ error: "Idempotency-Key was already used for another photo upload" }); return; }
+  if (result.kind === "locked") { res.status(403).json({ error: "Cannot modify a completed report" }); return; }
+  if (result.kind === "replay") { res.setHeader("Idempotent-Replay", "true"); }
+  res.status(result.kind === "created" ? 201 : 200).json(formatPhoto(result.photo));
 });
 
 router.patch("/reports/:reportId/photos/:photoId", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {

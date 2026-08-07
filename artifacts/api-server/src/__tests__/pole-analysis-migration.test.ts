@@ -8,8 +8,8 @@ const schemaUrl = new URL("../../../../lib/db/src/schema/pole-analysis.ts", impo
 
 test("pole analysis migration is additive and repeat-safe", async () => {
   const source = await readFile(migrationUrl, "utf8");
-  assert.equal(source.match(/CREATE TABLE IF NOT EXISTS/g)?.length, 7);
-  assert.equal(source.match(/CREATE UNIQUE INDEX IF NOT EXISTS/g)?.length, 14);
+  assert.equal(source.match(/CREATE TABLE IF NOT EXISTS/g)?.length, 8);
+  assert.equal(source.match(/CREATE UNIQUE INDEX IF NOT EXISTS/g)?.length, 16);
   assert.doesNotMatch(source, /ALTER TABLE|TRUNCATE|DELETE FROM|DROP TABLE/i);
   assert.match(source, /BEGIN;/);
   assert.match(source, /COMMIT;/);
@@ -20,6 +20,9 @@ test("pole persistence enforces company scope, immutable evidence, versions, and
   assert.match(source, /pole_profiles\(company_id, asset_key\)/);
   assert.match(source, /pole_type_catalog_items\(company_id, axis, code\)/);
   assert.match(source, /pole_reference_photos\(company_id, image_sha256\)/);
+  assert.match(source, /pole_analysis_jobs\(company_id, request_key\)/);
+  assert.match(source, /pole_analysis_jobs\(photo_id, generation\)/);
+  assert.match(source, /status IN \('queued', 'processing', 'retry_wait', 'succeeded', 'failed', 'cancelled'\)/);
   assert.match(source, /pole_analysis_runs\(photo_id, version\)/);
   assert.match(source, /pole_analysis_runs\(company_id, idempotency_key\)/);
   assert.match(source, /pole_analysis_runs\(company_id, confirmation_idempotency_key\)/);
@@ -36,12 +39,15 @@ test("database schema mirrors migration constraints and exports all pole tables"
     "poleProfilesTable",
     "poleTypeCatalogItemsTable",
     "poleReferencePhotosTable",
+    "poleAnalysisJobsTable",
     "poleAnalysisRunsTable",
     "poleAnalysisCandidatesTable",
     "poleAnalysisFieldsTable",
     "poleAnalysisDecisionsTable",
   ]) assert.match(source, new RegExp(`export const ${table}`));
   assert.match(source, /companyId, table\.idempotencyKey/);
+  assert.match(source, /companyId, table\.requestKey/);
+  assert.match(source, /table\.photoId, table\.generation/);
   assert.match(source, /companyId, table\.confirmationIdempotencyKey/);
   assert.match(source, /table\.photoId, table\.version/);
   assert.match(source, /table\.analysisRunId, table\.fieldKey/);
@@ -57,6 +63,7 @@ test("rollback removes only new pole-analysis tables in dependency-safe order", 
     "pole_analysis_fields",
     "pole_analysis_candidates",
     "pole_analysis_runs",
+    "pole_analysis_jobs",
     "pole_reference_photos",
     "pole_type_catalog_items",
     "pole_profiles",

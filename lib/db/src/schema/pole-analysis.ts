@@ -79,6 +79,32 @@ export const poleReferencePhotosTable = pgTable("pole_reference_photos", {
   check("pole_reference_photos_sha256_format", sql`${table.imageSha256} ~ '^[0-9a-fA-F]{64}$'`),
 ]);
 
+export const poleAnalysisJobsTable = pgTable("pole_analysis_jobs", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull().references(() => companiesTable.id, { onDelete: "cascade" }),
+  reportId: integer("report_id").notNull().references(() => dailyReportsTable.id, { onDelete: "cascade" }),
+  photoId: integer("photo_id").notNull().references(() => photosTable.id, { onDelete: "cascade" }),
+  requestKey: text("request_key").notNull(),
+  generation: integer("generation").notNull().default(1),
+  status: text("status").notNull().default("queued"),
+  attemptCount: integer("attempt_count").notNull().default(0),
+  maxAttempts: integer("max_attempts").notNull().default(3),
+  availableAt: timestamp("available_at", { withTimezone: true }).notNull().defaultNow(),
+  leaseOwner: text("lease_owner"),
+  leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
+  lastErrorCode: text("last_error_code"),
+  lastErrorAt: timestamp("last_error_at", { withTimezone: true }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, table => [
+  uniqueIndex("pole_analysis_jobs_company_request_uq").on(table.companyId, table.requestKey),
+  uniqueIndex("pole_analysis_jobs_photo_generation_uq").on(table.photoId, table.generation),
+  check("pole_analysis_jobs_generation_positive", sql`${table.generation} > 0`),
+  check("pole_analysis_jobs_attempts_valid", sql`${table.attemptCount} >= 0 and ${table.maxAttempts} between 1 and 10 and ${table.attemptCount} <= ${table.maxAttempts}`),
+  check("pole_analysis_jobs_status_allowed", sql`${table.status} in ('queued', 'processing', 'retry_wait', 'succeeded', 'failed', 'cancelled')`),
+]);
+
 export const poleAnalysisRunsTable = pgTable("pole_analysis_runs", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull().references(() => companiesTable.id, { onDelete: "cascade" }),
@@ -176,4 +202,5 @@ export const poleAnalysisDecisionsTable = pgTable("pole_analysis_decisions", {
 
 export type PoleProfile = typeof poleProfilesTable.$inferSelect;
 export type PoleTypeCatalogItem = typeof poleTypeCatalogItemsTable.$inferSelect;
+export type PoleAnalysisJob = typeof poleAnalysisJobsTable.$inferSelect;
 export type PoleAnalysisRun = typeof poleAnalysisRunsTable.$inferSelect;

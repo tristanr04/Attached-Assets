@@ -50,6 +50,29 @@ CREATE TABLE IF NOT EXISTS pole_reference_photos (
 CREATE UNIQUE INDEX IF NOT EXISTS pole_reference_photos_profile_photo_uq ON pole_reference_photos(pole_profile_id, photo_id);
 CREATE UNIQUE INDEX IF NOT EXISTS pole_reference_photos_company_hash_uq ON pole_reference_photos(company_id, image_sha256);
 
+CREATE TABLE IF NOT EXISTS pole_analysis_jobs (
+  id serial PRIMARY KEY,
+  company_id integer NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  report_id integer NOT NULL REFERENCES daily_reports(id) ON DELETE CASCADE,
+  photo_id integer NOT NULL REFERENCES photos(id) ON DELETE CASCADE,
+  request_key text NOT NULL,
+  generation integer NOT NULL DEFAULT 1 CHECK (generation > 0),
+  status text NOT NULL DEFAULT 'queued' CHECK (status IN ('queued', 'processing', 'retry_wait', 'succeeded', 'failed', 'cancelled')),
+  attempt_count integer NOT NULL DEFAULT 0,
+  max_attempts integer NOT NULL DEFAULT 3,
+  available_at timestamptz NOT NULL DEFAULT now(),
+  lease_owner text,
+  lease_expires_at timestamptz,
+  last_error_code text,
+  last_error_at timestamptz,
+  completed_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT pole_analysis_jobs_attempts_valid CHECK (attempt_count >= 0 AND max_attempts BETWEEN 1 AND 10 AND attempt_count <= max_attempts)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS pole_analysis_jobs_company_request_uq ON pole_analysis_jobs(company_id, request_key);
+CREATE UNIQUE INDEX IF NOT EXISTS pole_analysis_jobs_photo_generation_uq ON pole_analysis_jobs(photo_id, generation);
+
 CREATE TABLE IF NOT EXISTS pole_analysis_runs (
   id serial PRIMARY KEY,
   company_id integer NOT NULL REFERENCES companies(id) ON DELETE CASCADE,

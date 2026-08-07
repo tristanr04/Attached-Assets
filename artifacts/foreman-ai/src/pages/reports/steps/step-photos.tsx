@@ -51,6 +51,7 @@ interface PendingPhoto {
   dataUrl: string;
   category: PhotoCategory;
   caption: string;
+  uploadKey: string;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -94,6 +95,12 @@ function compressImage(file: File): Promise<string> {
     };
     reader.readAsDataURL(file);
   });
+}
+
+function createPhotoUploadKey(): string {
+  const entropy = globalThis.crypto?.randomUUID?.()
+    ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return `pole-photo:${entropy}`;
 }
 
 // ── Lightbox ──────────────────────────────────────────────────────────────────
@@ -145,7 +152,7 @@ export default function StepPhotos({ report }: { report: DailyReportDetail }) {
     if (err) { toast({ title: "Cannot use this photo", description: err, variant: "destructive" }); return; }
     try {
       const dataUrl = await compressImage(file);
-      setPending({ dataUrl, category: "full_pole", caption: "" });
+      setPending({ dataUrl, category: "full_pole", caption: "", uploadKey: createPhotoUploadKey() });
       setUploadError(null);
     } catch (ex) {
       toast({ title: "Failed to process image", description: String(ex), variant: "destructive" });
@@ -158,7 +165,10 @@ export default function StepPhotos({ report }: { report: DailyReportDetail }) {
     setIsUploading(true);
     setUploadError(null);
     try {
-      await uploadMutation.mutateAsync({ body: { dataUrl: pending.dataUrl, caption: pending.caption, category: pending.category } });
+      await uploadMutation.mutateAsync({
+        body: { dataUrl: pending.dataUrl, caption: pending.caption, category: pending.category },
+        headers: { "Idempotency-Key": pending.uploadKey },
+      });
       queryClient.invalidateQueries({ queryKey: [`${BASE}${photosEndpoint}`] });
       setPending(null);
       toast({ title: "Photo saved", description: `${CATEGORY_LABELS[pending.category]} photo added.` });

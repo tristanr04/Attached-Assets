@@ -20,7 +20,7 @@ import {
 } from "../lib/reportState";
 import { parseDecimalInput, parseLaborHours } from "../lib/numericInput";
 import { normalizeTemplateItems } from "../lib/templateItems";
-import { applicationLockKey, parseIdempotencyKey } from "../lib/idempotency";
+import { applicationLockKey, parseIdempotencyKey, photoUploadLockKey } from "../lib/idempotency";
 import { canManageCrew } from "../lib/crewAccess";
 import {
   normalizeBillableNumbers,
@@ -374,6 +374,10 @@ test("daily report creation uses a stable company, foreman, and date lock key", 
     dailyReportLockKey(4, 12, "2026-08-07"),
     dailyReportLockKey(4, 13, "2026-08-07"),
   );
+  assert.equal(
+    photoUploadLockKey(2, "photo-upload-123"),
+    "pole-photo-upload:2:photo-upload-123",
+  );
 });
 
 test("daily report creation serializes and replays duplicate submissions", async () => {
@@ -433,7 +437,34 @@ test("report completion serializes with pole confirmation and blocks pending AI 
   assert.match(completionRoute, /eq\(poleAnalysisRunsTable\.companyId, current\.companyId\)/);
   assert.match(completionRoute, /eq\(poleAnalysisRunsTable\.reportId, reportId\)/);
   assert.match(completionRoute, /eq\(poleAnalysisRunsTable\.status, "ai_proposed"\)/);
+  assert.match(completionRoute, /eq\(poleAnalysisJobsTable\.companyId, current\.companyId\)/);
+  assert.match(completionRoute, /eq\(poleAnalysisJobsTable\.reportId, reportId\)/);
+  assert.match(completionRoute, /\["queued", "processing", "retry_wait"\]/);
   assert.match(completionRoute, /Review and confirm or reject the pending pole analysis/);
+});
+
+test("photo upload is retry-safe and enqueues analysis atomically", async () => {
+  const source = await readFile(
+    new URL("../routes/reports.ts", import.meta.url),
+    "utf8",
+  );
+  const route = source.slice(
+    source.indexOf('router.post("/reports/:reportId/photos"'),
+    source.indexOf('router.patch("/reports/:reportId/photos/:photoId"'),
+  );
+
+  assert.match(route, /parseIdempotencyKey\(req\.get\("Idempotency-Key"\)\)/);
+  assert.match(route, /photoUploadLockKey\(report\.companyId, idempotencyKey\)/);
+  assert.match(route, /db\.transaction/);
+  assert.match(route, /pg_advisory_xact_lock/);
+  assert.match(route, /select id from daily_reports where id = \$\{reportId\} for update/);
+  assert.match(route, /current\.status === "complete"/);
+  assert.match(route, /eq\(poleAnalysisJobsTable\.companyId, report\.companyId\)/);
+  assert.match(route, /eq\(poleAnalysisJobsTable\.requestKey, idempotencyKey\)/);
+  assert.match(route, /tx\.insert\(photosTable\)/);
+  assert.match(route, /tx\.insert\(poleAnalysisJobsTable\)/);
+  assert.match(route, /Idempotent-Replay/);
+  assert.match(route, /result\.kind === "created" \? 201 : 200/);
 });
 
 test("all report child mutation routes enforce the completion lock", async () => {
