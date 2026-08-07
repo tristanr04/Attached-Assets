@@ -23,6 +23,12 @@ The identity engine ranks candidates from four independently recorded signals: n
 
 If those gates fail, the engine returns at most three company-scoped candidates and requests the missing evidence: a close pole-tag photo, location-enabled full-pole photo, second equipment/framing angle, or wider landmark view. It never converts uncertainty into an exact asset ID. Exact image hashes identify duplicate uploads, while re-analysis and confirmation still use version and idempotency protections.
 
+## Pole type and construction classification
+
+Pole type is never one flat label. The structured proposal keeps five independently reviewable axes: asset purpose (including the difference between streetlight-only and distribution-with-light), phase configuration, construction role (tangent, angle, dead-end, junction, tap, and related roles), equipment roles, and framing configuration. Generic visual facts map to the current company's active catalog names and IDs; company-specific naming never changes the underlying evidence.
+
+Each axis requires relevant photo evidence. Phase needs conductor/insulator visibility, framing needs a pole-top/framing view, equipment needs a device view, dead-end/terminal needs termination or guy evidence, and junction/tap/branch needs conductor-direction evidence. Insufficient or obscured views request the exact missing angle. Every classification remains AI-proposed and independently confirmable; it cannot establish safety, work performed, quantities, or charges.
+
 ## Persistence needed before live rollout
 
 - `pole_analysis_runs`: company, report, photo, version, target-match status/evidence, raw result, model/prompt versions, state, timestamps.
@@ -38,4 +44,4 @@ Migrations must be additive, preserve existing reports/photos, support repeat-sa
 
 ## Current checkpoint
 
-The executable contracts and fictional fixture tests define field allowlists, evidence/confidence requirements, cross-company/report/photo rejection, conservative multi-signal pole ranking, adjacent-lookalike ambiguity, specific additional-photo requests, stale-reference discounting, duplicate-photo detection, completed-report locking, decision completeness, stale-version rejection, immutable confirmation output, and field-level scoring. Database persistence, OCR/barcode and visual-fingerprint providers, verified-profile maintenance, worker calls, report autofill UI, authenticated mobile rendering, and real-device photo behavior remain unimplemented and must not be represented as live.
+The executable contracts and fictional fixture tests define field allowlists, evidence/confidence requirements, cross-company/report/photo rejection, conservative multi-signal pole ranking, multi-axis pole construction classification, company-specific type mapping, streetlight/distribution separation, junction evidence gates, adjacent-lookalike ambiguity, specific additional-photo requests, stale-reference discounting, duplicate-photo detection, completed-report locking, decision completeness, stale-version rejection, immutable confirmation output, and field-level scoring. Database persistence, OCR/barcode and visual-fingerprint providers, verified-profile maintenance, worker calls, report autofill UI, authenticated mobile rendering, and real-device photo behavior remain unimplemented and must not be represented as live.
