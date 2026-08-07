@@ -209,3 +209,17 @@ test("all report child mutation routes enforce the completion lock", async () =>
     /eq\(dailyReportsTable\.status, report\.status\)/,
   );
 });
+
+test("report line-item references are scoped to the report company", async () => {
+  const source = await readFile(
+    new URL("../routes/reports.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(source, /eq\(crewsTable\.companyId, companyId\)/);
+  assert.match(source, /eq\(catalogMaterialsTable\.companyId, companyId\)/);
+  assert.match(source, /eq\(catalogEquipmentTable\.companyId, companyId\)/);
+  assert.match(source, /crewMemberId: normalizedCrewMemberId/);
+  assert.match(source, /catalogMaterialId: normalizedCatalogMaterialId/);
+  assert.match(source, /catalogEquipmentId: normalizedCatalogEquipmentId/);
+});

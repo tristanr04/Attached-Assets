@@ -2,7 +2,8 @@ import { Router, type IRouter, type Response } from "express";
 import { eq, and, desc } from "drizzle-orm";
 import {
   db, dailyReportsTable, companyMembershipsTable, usersTable,
-  projectsTable, crewsTable, timeEntriesTable, reportMaterialsTable,
+  projectsTable, crewsTable, crewMembersTable, timeEntriesTable,
+  catalogMaterialsTable, reportMaterialsTable, catalogEquipmentTable,
   reportEquipmentTable, photosTable, signaturesTable
 } from "@workspace/db";
 import { requireAuth, type AuthenticatedRequest } from "../middlewares/requireAuth";
@@ -62,6 +63,50 @@ async function normalizeReportReferences(
   }
 
   return null;
+}
+
+async function normalizeLineItemReference(
+  companyId: number,
+  value: unknown,
+  kind: "crewMember" | "catalogMaterial" | "catalogEquipment",
+): Promise<number | null | undefined> {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  const id = parsePositiveId(value);
+  if (id === null) {
+    return undefined;
+  }
+
+  if (kind === "crewMember") {
+    const [record] = await db.select({ id: crewMembersTable.id })
+      .from(crewMembersTable)
+      .innerJoin(crewsTable, eq(crewMembersTable.crewId, crewsTable.id))
+      .where(and(
+        eq(crewMembersTable.id, id),
+        eq(crewsTable.companyId, companyId),
+      ));
+    return record ? id : undefined;
+  }
+
+  if (kind === "catalogMaterial") {
+    const [record] = await db.select({ id: catalogMaterialsTable.id })
+      .from(catalogMaterialsTable)
+      .where(and(
+        eq(catalogMaterialsTable.id, id),
+        eq(catalogMaterialsTable.companyId, companyId),
+      ));
+    return record ? id : undefined;
+  }
+
+  const [record] = await db.select({ id: catalogEquipmentTable.id })
+    .from(catalogEquipmentTable)
+    .where(and(
+      eq(catalogEquipmentTable.id, id),
+      eq(catalogEquipmentTable.companyId, companyId),
+    ));
+  return record ? id : undefined;
 }
 
 async function enrichReport(r: typeof dailyReportsTable.$inferSelect) {
@@ -306,13 +351,22 @@ router.post("/reports/:reportId/time-entries", requireAuth, async (req: Authenti
 
   const { employeeName, trade, regularHours, overtimeHours, doubleTimeHours, crewMemberId } = req.body;
   if (!employeeName || !trade) { res.status(400).json({ error: "employeeName and trade are required" }); return; }
+  const normalizedCrewMemberId = await normalizeLineItemReference(
+    report.companyId,
+    crewMemberId,
+    "crewMember",
+  );
+  if (normalizedCrewMemberId === undefined) {
+    res.status(400).json({ error: "crewMemberId must belong to the report company" });
+    return;
+  }
 
   const [entry] = await db.insert(timeEntriesTable).values({
     reportId, employeeName, trade,
     regularHours: String(regularHours ?? 0),
     overtimeHours: String(overtimeHours ?? 0),
     doubleTimeHours: String(doubleTimeHours ?? 0),
-    crewMemberId: crewMemberId ?? null,
+    crewMemberId: normalizedCrewMemberId,
   }).returning();
   res.status(201).json(formatTimeEntry(entry));
 });
@@ -376,7 +430,16 @@ router.post("/reports/:reportId/materials", requireAuth, async (req: Authenticat
   if (rejectLockedReport(report, m.role, res)) { return; }
   const { name, quantity, unit, notes, catalogMaterialId } = req.body;
   if (!name || quantity == null || !unit) { res.status(400).json({ error: "name, quantity, unit required" }); return; }
-  const [mat] = await db.insert(reportMaterialsTable).values({ reportId, name, quantity: String(quantity), unit, notes: notes ?? null, catalogMaterialId: catalogMaterialId ?? null }).returning();
+  const normalizedCatalogMaterialId = await normalizeLineItemReference(
+    report.companyId,
+    catalogMaterialId,
+    "catalogMaterial",
+  );
+  if (normalizedCatalogMaterialId === undefined) {
+    res.status(400).json({ error: "catalogMaterialId must belong to the report company" });
+    return;
+  }
+  const [mat] = await db.insert(reportMaterialsTable).values({ reportId, name, quantity: String(quantity), unit, notes: notes ?? null, catalogMaterialId: normalizedCatalogMaterialId }).returning();
   res.status(201).json(formatMaterial(mat));
 });
 
@@ -436,9 +499,18 @@ router.post("/reports/:reportId/equipment", requireAuth, async (req: Authenticat
   if (rejectLockedReport(report, m.role, res)) { return; }
   const { name, hoursUsed, notes, unitId, catalogEquipmentId } = req.body;
   if (!name) { res.status(400).json({ error: "name is required" }); return; }
+  const normalizedCatalogEquipmentId = await normalizeLineItemReference(
+    report.companyId,
+    catalogEquipmentId,
+    "catalogEquipment",
+  );
+  if (normalizedCatalogEquipmentId === undefined) {
+    res.status(400).json({ error: "catalogEquipmentId must belong to the report company" });
+    return;
+  }
   const [equip] = await db.insert(reportEquipmentTable).values({
     reportId, name, hoursUsed: String(hoursUsed ?? 0), notes: notes ?? null,
-    unitId: unitId ?? null, catalogEquipmentId: catalogEquipmentId ?? null,
+    unitId: unitId ?? null, catalogEquipmentId: normalizedCatalogEquipmentId,
   }).returning();
   res.status(201).json(formatEquipment(equip));
 });
