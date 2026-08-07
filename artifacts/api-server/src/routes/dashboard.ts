@@ -5,6 +5,10 @@ import {
   usersTable, timeEntriesTable
 } from "@workspace/db";
 import { requireAuth, type AuthenticatedRequest } from "../middlewares/requireAuth";
+import {
+  parsePositiveId,
+  selectCompanyMembership,
+} from "../lib/requestValues";
 
 const router: IRouter = Router();
 
@@ -40,7 +44,13 @@ async function enrichReport(r: typeof dailyReportsTable.$inferSelect) {
 // ── Foreman Dashboard ─────────────────────────────────────────────────────────
 router.get("/dashboard", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const companyId = req.query.companyId ? parseInt(req.query.companyId as string, 10) : null;
+  const requestedCompanyId = req.query.companyId === undefined
+    ? null
+    : parsePositiveId(req.query.companyId);
+  if (req.query.companyId !== undefined && requestedCompanyId === null) {
+    res.status(400).json({ error: "Invalid companyId" });
+    return;
+  }
 
   const memberships = await db.select().from(companyMembershipsTable)
     .where(eq(companyMembershipsTable.clerkUserId, req.clerkUserId));
@@ -49,7 +59,12 @@ router.get("/dashboard", requireAuth, async (req: AuthenticatedRequest, res): Pr
     return;
   }
 
-  const targetCompanyId = companyId ?? memberships[0].companyId;
+  const targetMembership = selectCompanyMembership(memberships, requestedCompanyId);
+  if (!targetMembership) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  const targetCompanyId = targetMembership.companyId;
   const today = new Date().toISOString().split("T")[0];
 
   const allReports = await db.select().from(dailyReportsTable)
@@ -90,7 +105,13 @@ router.get("/dashboard", requireAuth, async (req: AuthenticatedRequest, res): Pr
 // ── Supervisor Dashboard ──────────────────────────────────────────────────────
 router.get("/dashboard/supervisor", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const companyId = req.query.companyId ? parseInt(req.query.companyId as string, 10) : null;
+  const requestedCompanyId = req.query.companyId === undefined
+    ? null
+    : parsePositiveId(req.query.companyId);
+  if (req.query.companyId !== undefined && requestedCompanyId === null) {
+    res.status(400).json({ error: "Invalid companyId" });
+    return;
+  }
 
   const memberships = await db.select().from(companyMembershipsTable)
     .where(eq(companyMembershipsTable.clerkUserId, req.clerkUserId));
@@ -99,7 +120,16 @@ router.get("/dashboard/supervisor", requireAuth, async (req: AuthenticatedReques
     return;
   }
 
-  const targetCompanyId = companyId ?? memberships[0].companyId;
+  const targetMembership = selectCompanyMembership(
+    memberships,
+    requestedCompanyId,
+    ["admin", "supervisor"],
+  );
+  if (!targetMembership) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  const targetCompanyId = targetMembership.companyId;
   const allReports = await db.select().from(dailyReportsTable)
     .where(eq(dailyReportsTable.companyId, targetCompanyId))
     .orderBy(desc(dailyReportsTable.reportDate));
@@ -131,7 +161,13 @@ router.get("/dashboard/supervisor", requireAuth, async (req: AuthenticatedReques
 // ── Admin Dashboard ───────────────────────────────────────────────────────────
 router.get("/dashboard/admin", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const companyId = req.query.companyId ? parseInt(req.query.companyId as string, 10) : null;
+  const requestedCompanyId = req.query.companyId === undefined
+    ? null
+    : parsePositiveId(req.query.companyId);
+  if (req.query.companyId !== undefined && requestedCompanyId === null) {
+    res.status(400).json({ error: "Invalid companyId" });
+    return;
+  }
 
   const memberships = await db.select().from(companyMembershipsTable)
     .where(eq(companyMembershipsTable.clerkUserId, req.clerkUserId));
@@ -140,7 +176,16 @@ router.get("/dashboard/admin", requireAuth, async (req: AuthenticatedRequest, re
     return;
   }
 
-  const targetCompanyId = companyId ?? memberships[0].companyId;
+  const targetMembership = selectCompanyMembership(
+    memberships,
+    requestedCompanyId,
+    ["admin"],
+  );
+  if (!targetMembership) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  const targetCompanyId = targetMembership.companyId;
 
   const [allMembers, allReports, allProjects, allCrews] = await Promise.all([
     db.select().from(companyMembershipsTable).where(eq(companyMembershipsTable.companyId, targetCompanyId)),

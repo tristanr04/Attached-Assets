@@ -1,9 +1,10 @@
 import { getAuth } from "@clerk/express";
 import type { Request, Response, NextFunction } from "express";
 import { db, usersTable, companyMembershipsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+import { parsePositiveId } from "../lib/requestValues";
 
-export interface AuthenticatedRequest extends Request {
+export interface AuthenticatedRequest extends Request<Record<string, string>> {
   userId?: number;
   clerkUserId?: string;
   companyRole?: string;
@@ -44,8 +45,10 @@ export const requireCompanyRole = (
   res: Response,
   next: NextFunction,
 ): Promise<void> => {
-  const companyId = parseInt(req.params.companyId ?? req.query.companyId as string, 10);
-  if (!req.userId || isNaN(companyId)) {
+  const companyId = parsePositiveId(
+    req.params.companyId ?? req.query.companyId,
+  );
+  if (!req.userId || !req.clerkUserId || companyId === null) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
@@ -53,7 +56,10 @@ export const requireCompanyRole = (
   const [membership] = await db
     .select()
     .from(companyMembershipsTable)
-    .where(eq(companyMembershipsTable.companyId, companyId));
+    .where(and(
+      eq(companyMembershipsTable.companyId, companyId),
+      eq(companyMembershipsTable.clerkUserId, req.clerkUserId),
+    ));
 
   if (!membership || !roles.includes(membership.role)) {
     res.status(403).json({ error: "Forbidden" });

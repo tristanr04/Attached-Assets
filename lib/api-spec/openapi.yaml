@@ -637,6 +637,11 @@ paths:
           in: query
           schema:
             type: integer
+        - name: reportDate
+          in: query
+          schema:
+            type: string
+            format: date
         - name: status
           in: query
           schema:
