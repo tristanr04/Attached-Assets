@@ -20,6 +20,10 @@ test("review reads enforce report access and return structured evidence without 
   assert.match(route, /reviewRequirement: field\.reviewRequirement/);
   assert.match(route, /signalEvidence: candidate\.signalEvidence/);
   assert.doesNotMatch(route, /rawResult: run\.rawResult/);
+  assert.match(route, /orderBy\(desc\(poleAnalysisRunsTable\.version\)\)\.limit\(1\)/);
+  assert.match(route, /analysis: run \? \{/);
+  assert.match(route, /\.\.\.await reviewResponseFor\(run\)/);
+  assert.match(route, /canConfirm: Boolean\(membership\.userId && membership\.userId === report\.foremanId\)/);
 });
 
 test("pole analysis confirmation serializes writers and preserves completed-report locks", () => {

@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { and, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import {
   companyMembershipsTable,
   dailyReportsTable,
@@ -21,6 +21,96 @@ import { parsePositiveId } from "../lib/requestValues";
 import { canAccessReport } from "../lib/reportState";
 
 const router: IRouter = Router();
+
+async function reviewResponseFor(run: typeof poleAnalysisRunsTable.$inferSelect) {
+  const [fields, candidates, decisions] = await Promise.all([
+    db.select().from(poleAnalysisFieldsTable).where(eq(poleAnalysisFieldsTable.analysisRunId, run.id)),
+    db.select().from(poleAnalysisCandidatesTable).where(eq(poleAnalysisCandidatesTable.analysisRunId, run.id)),
+    db.select().from(poleAnalysisDecisionsTable).where(eq(poleAnalysisDecisionsTable.analysisRunId, run.id)),
+  ]);
+  return {
+    analysisRunId: run.id,
+    analysisId: run.analysisKey,
+    version: run.version,
+    status: run.status,
+    targetMatch: run.targetMatch,
+    selectedPoleProfileId: run.selectedPoleProfileId,
+    targetEvidence: run.targetEvidence,
+    limitations: run.limitations,
+    model: {
+      provider: run.modelProvider,
+      model: run.modelName,
+      modelVersion: run.modelVersion,
+      promptVersion: run.promptVersion,
+    },
+    fields: fields.map(field => ({
+      key: field.fieldKey,
+      proposedValue: field.proposedValue,
+      confidence: Number(field.confidence),
+      evidence: field.evidence,
+      reviewRequirement: field.reviewRequirement,
+      additionalPhotoRequest: field.additionalPhotoRequest,
+    })),
+    candidates: candidates.map(candidate => ({
+      poleProfileId: candidate.poleProfileId,
+      rank: candidate.rank,
+      score: Number(candidate.score),
+      signalEvidence: candidate.signalEvidence,
+    })),
+    decisions: decisions.map(decision => ({
+      fieldKey: decision.fieldKey,
+      action: decision.action,
+      finalValue: decision.finalValue,
+      note: decision.note,
+      actorUserId: decision.actorUserId,
+      decidedAt: decision.decidedAt,
+    })),
+    createdAt: run.createdAt,
+    confirmedAt: run.confirmedAt,
+  };
+}
+
+router.get(
+  "/reports/:reportId/photos/:photoId/pole-analysis",
+  requireAuth,
+  async (req: AuthenticatedRequest, res): Promise<void> => {
+    if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
+    const reportId = parsePositiveId(req.params.reportId);
+    const photoId = parsePositiveId(req.params.photoId);
+    if (reportId === null || photoId === null) {
+      res.status(400).json({ error: "Invalid report or photo identifier" });
+      return;
+    }
+
+    const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
+    if (!report) { res.status(404).json({ error: "Not found" }); return; }
+    const [membership] = await db.select().from(companyMembershipsTable).where(and(
+      eq(companyMembershipsTable.companyId, report.companyId),
+      eq(companyMembershipsTable.clerkUserId, req.clerkUserId),
+    ));
+    if (!membership || !canAccessReport(membership.role, membership.userId, report.foremanId)) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
+
+    const [photo] = await db.select({ id: photosTable.id }).from(photosTable).where(and(
+      eq(photosTable.id, photoId),
+      eq(photosTable.reportId, reportId),
+    ));
+    if (!photo) { res.status(404).json({ error: "Photo not found on this report" }); return; }
+    const [run] = await db.select().from(poleAnalysisRunsTable).where(and(
+      eq(poleAnalysisRunsTable.companyId, report.companyId),
+      eq(poleAnalysisRunsTable.reportId, reportId),
+      eq(poleAnalysisRunsTable.photoId, photoId),
+    )).orderBy(desc(poleAnalysisRunsTable.version)).limit(1);
+    res.json({
+      analysis: run ? {
+        ...await reviewResponseFor(run),
+        canConfirm: Boolean(membership.userId && membership.userId === report.foremanId),
+      } : null,
+    });
+  },
+);
 
 router.get(
   "/reports/:reportId/photos/:photoId/pole-analysis/:analysisRunId",
@@ -59,50 +149,9 @@ router.get(
     ));
     if (!run) { res.status(404).json({ error: "Pole analysis not found" }); return; }
 
-    const [fields, candidates, decisions] = await Promise.all([
-      db.select().from(poleAnalysisFieldsTable).where(eq(poleAnalysisFieldsTable.analysisRunId, analysisRunId)),
-      db.select().from(poleAnalysisCandidatesTable).where(eq(poleAnalysisCandidatesTable.analysisRunId, analysisRunId)),
-      db.select().from(poleAnalysisDecisionsTable).where(eq(poleAnalysisDecisionsTable.analysisRunId, analysisRunId)),
-    ]);
     res.json({
-      analysisRunId: run.id,
-      analysisId: run.analysisKey,
-      version: run.version,
-      status: run.status,
-      targetMatch: run.targetMatch,
-      selectedPoleProfileId: run.selectedPoleProfileId,
-      targetEvidence: run.targetEvidence,
-      limitations: run.limitations,
-      model: {
-        provider: run.modelProvider,
-        model: run.modelName,
-        modelVersion: run.modelVersion,
-        promptVersion: run.promptVersion,
-      },
-      fields: fields.map(field => ({
-        key: field.fieldKey,
-        proposedValue: field.proposedValue,
-        confidence: Number(field.confidence),
-        evidence: field.evidence,
-        reviewRequirement: field.reviewRequirement,
-        additionalPhotoRequest: field.additionalPhotoRequest,
-      })),
-      candidates: candidates.map(candidate => ({
-        poleProfileId: candidate.poleProfileId,
-        rank: candidate.rank,
-        score: Number(candidate.score),
-        signalEvidence: candidate.signalEvidence,
-      })),
-      decisions: decisions.map(decision => ({
-        fieldKey: decision.fieldKey,
-        action: decision.action,
-        finalValue: decision.finalValue,
-        note: decision.note,
-        actorUserId: decision.actorUserId,
-        decidedAt: decision.decidedAt,
-      })),
-      createdAt: run.createdAt,
-      confirmedAt: run.confirmedAt,
+      ...await reviewResponseFor(run),
+      canConfirm: Boolean(membership.userId && membership.userId === report.foremanId),
     });
   },
 );

@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useApiQuery, useApiMutation } from "@/hooks/use-api";
+import PoleAnalysisReviewCard from "../pole-analysis-review";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 type PhotoCategory =
@@ -398,6 +399,7 @@ export default function StepPhotos({ report }: { report: DailyReportDetail }) {
                         </div>
                       </div>
                     </div>
+                    <PoleAnalysisReviewCard reportId={report.id} photo={photo} locked={isLocked} />
                   </CardContent>
                 </Card>
               );
@@ -412,7 +414,7 @@ export default function StepPhotos({ report }: { report: DailyReportDetail }) {
           <ImageIcon className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
           <div>
             <p className="font-bold">Photo saved.</p>
-            <p className="text-muted-foreground mt-0.5">Automated pole analysis is not configured yet. Photos are saved as billing evidence.</p>
+            <p className="text-muted-foreground mt-0.5">When a structured analysis is available, its field-by-field foreman review appears beneath the source photo.</p>
           </div>
         </div>
       )}
