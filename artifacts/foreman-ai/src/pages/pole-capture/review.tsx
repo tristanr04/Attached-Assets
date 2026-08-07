@@ -82,6 +82,41 @@ interface IdentityResult {
   requestedCapture: RequestedCapture;
 }
 
+// ── Classification Engine types ────────────────────────────────────────────
+type AssetPurpose = "streetlight_only" | "distribution" | "transmission" | "communications" | "joint_use";
+type PhaseConfig = "none" | "single_phase" | "two_phase" | "three_phase";
+type ConstructionRole = "tangent" | "angle" | "corner" | "dead_end" | "terminal" | "junction" | "tap" | "branch" | "crossing" | "service" | "underground_riser";
+type EquipmentRole = "light" | "transformer" | "transformer_bank" | "switch" | "cutout" | "recloser" | "sectionalizer" | "capacitor_bank" | "regulator" | "fused_tap";
+type FramingConfig = "crossarm" | "armless" | "vertical" | "alley_arm" | "single_arm" | "double_arm" | "custom";
+type NeedsPhoto = "pole_top_closeup" | "conductor_direction" | "equipment_closeup" | "full_pole_view" | "base_closeup";
+
+interface ClassificationCatalogMatch {
+  id: number;
+  name: string;
+  code: string;
+  matchScore: number;
+}
+
+interface ClassificationAxis<T> {
+  value: T | null;
+  also?: string[];
+  confidence: number;
+  evidence: string[];
+  needsPhoto: NeedsPhoto | null;
+  catalogMatch: ClassificationCatalogMatch | null;
+}
+
+interface ClassificationResult {
+  assetPurpose: ClassificationAxis<AssetPurpose>;
+  phaseConfiguration: ClassificationAxis<PhaseConfig>;
+  constructionRole: ClassificationAxis<ConstructionRole>;
+  equipmentRole: ClassificationAxis<EquipmentRole[]>;
+  framingConfiguration: ClassificationAxis<FramingConfig>;
+  overallConfidence: number;
+  catalogMatchedPoleTypeId: number | null;
+  catalogMatchedStructureConfigId: number | null;
+}
+
 interface Analysis {
   id: number;
   status: string;
@@ -100,6 +135,7 @@ interface Analysis {
   duplicateOfId: number | null;
   poleAssetId: number | null;
   identityResult: IdentityResult | null;
+  classificationResult: ClassificationResult | null;
 }
 
 // ── Confidence helpers ────────────────────────────────────────────────────────
@@ -255,6 +291,391 @@ function FieldCard({
         </Button>
       </div>
     </div>
+  );
+}
+
+// ── Classification helpers ────────────────────────────────────────────────────
+
+const AXIS_OPTIONS: Record<string, { value: string; label: string }[]> = {
+  assetPurpose: [
+    { value: "distribution", label: "Distribution" },
+    { value: "transmission", label: "Transmission" },
+    { value: "streetlight_only", label: "Streetlight Only" },
+    { value: "communications", label: "Communications" },
+    { value: "joint_use", label: "Joint Use" },
+  ],
+  phaseConfiguration: [
+    { value: "none", label: "None (no primary)" },
+    { value: "single_phase", label: "Single Phase" },
+    { value: "two_phase", label: "Two Phase" },
+    { value: "three_phase", label: "Three Phase" },
+  ],
+  constructionRole: [
+    { value: "tangent", label: "Tangent" },
+    { value: "angle", label: "Angle" },
+    { value: "corner", label: "Corner" },
+    { value: "dead_end", label: "Dead End" },
+    { value: "terminal", label: "Terminal" },
+    { value: "junction", label: "Junction" },
+    { value: "tap", label: "Tap" },
+    { value: "branch", label: "Branch" },
+    { value: "crossing", label: "Crossing" },
+    { value: "service", label: "Service" },
+    { value: "underground_riser", label: "Underground Riser" },
+  ],
+  equipmentRole: [
+    { value: "light", label: "Light" },
+    { value: "transformer", label: "Transformer" },
+    { value: "transformer_bank", label: "Transformer Bank" },
+    { value: "switch", label: "Switch" },
+    { value: "cutout", label: "Cutout" },
+    { value: "recloser", label: "Recloser" },
+    { value: "sectionalizer", label: "Sectionalizer" },
+    { value: "capacitor_bank", label: "Capacitor Bank" },
+    { value: "regulator", label: "Voltage Regulator" },
+    { value: "fused_tap", label: "Fused Tap" },
+  ],
+  framingConfiguration: [
+    { value: "crossarm", label: "Crossarm" },
+    { value: "armless", label: "Armless" },
+    { value: "vertical", label: "Vertical" },
+    { value: "alley_arm", label: "Alley Arm" },
+    { value: "single_arm", label: "Single Arm" },
+    { value: "double_arm", label: "Double Arm" },
+    { value: "custom", label: "Custom / Company-Specific" },
+  ],
+};
+
+function formatAxisValue(axisKey: string, value: string | string[] | null | undefined): string {
+  if (!value) return "—";
+  if (Array.isArray(value)) {
+    if (value.length === 0) return "None detected";
+    return value.map(v => {
+      const opt = AXIS_OPTIONS[axisKey]?.find(o => o.value === v);
+      return opt?.label ?? v;
+    }).join(", ");
+  }
+  const opt = AXIS_OPTIONS[axisKey]?.find(o => o.value === value);
+  return opt?.label ?? value;
+}
+
+const NEEDS_PHOTO_LABELS: Record<NeedsPhoto, { title: string; description: string }> = {
+  pole_top_closeup: {
+    title: "Pole-Top Close-Up Needed",
+    description: "Photograph the pole top directly to show framing hardware and conductor arrangement clearly.",
+  },
+  conductor_direction: {
+    title: "Conductor Direction Photo Needed",
+    description: "Step back to see the full span where conductors leave the pole. Shows tangent vs. angle vs. dead-end clearly.",
+  },
+  equipment_closeup: {
+    title: "Equipment Close-Up Needed",
+    description: "Move closer to photograph mounted equipment so type and rating are clearly identifiable.",
+  },
+  full_pole_view: {
+    title: "Full Pole View Needed",
+    description: "Step back so the entire pole from base to top is visible in frame.",
+  },
+  base_closeup: {
+    title: "Base Close-Up Needed",
+    description: "Photograph the pole base to confirm underground riser conduit or grounding hardware.",
+  },
+};
+
+// ── Classification Axis Card ──────────────────────────────────────────────────
+interface ClassificationAxisCardProps {
+  axisKey: string;
+  label: string;
+  icon: React.ReactNode;
+  axis: ClassificationAxis<unknown>;
+  isMultiValue?: boolean;
+  status: FieldStatus;
+  editValue: string;
+  onAccept: () => void;
+  onReject: () => void;
+  onEdit: (val: string) => void;
+  onCommitEdit: () => void;
+}
+
+function ClassificationAxisCard({
+  axisKey, label, icon, axis, isMultiValue,
+  status, editValue, onAccept, onReject, onEdit, onCommitEdit,
+}: ClassificationAxisCardProps) {
+  const [editing, setEditing] = useState(false);
+  const [evidenceOpen, setEvidenceOpen] = useState(false);
+
+  const displayValue = formatAxisValue(axisKey, axis.value as string | string[] | null);
+  const options = AXIS_OPTIONS[axisKey] ?? [];
+  const needsPhotoInfo = axis.needsPhoto ? NEEDS_PHOTO_LABELS[axis.needsPhoto] : null;
+
+  const handleEdit = () => {
+    setEditing(true);
+    const v = axis.value;
+    onEdit(Array.isArray(v) ? (v as string[]).join(", ") : v != null ? String(v) : "");
+  };
+
+  const handleCommit = () => {
+    setEditing(false);
+    onCommitEdit();
+  };
+
+  return (
+    <div className={cn(
+      "border rounded-xl p-4 transition-all",
+      status === "accepted" ? "border-green-500/40 bg-green-500/5" :
+      status === "edited"   ? "border-blue-500/40 bg-blue-500/5" :
+      status === "rejected" ? "border-border bg-muted/20 opacity-60" :
+                              "border-border bg-card",
+    )}>
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-muted-foreground shrink-0">{icon}</span>
+          <span className="font-semibold text-sm">{label}</span>
+          <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-bold border-primary/40 text-primary">
+            AI Proposed
+          </Badge>
+        </div>
+        <ConfidencePill confidence={axis.confidence} />
+      </div>
+
+      {/* Value display */}
+      {!editing ? (
+        <div className={cn("text-sm mb-2 rounded-lg px-3 py-2 font-medium",
+          status === "rejected" ? "line-through text-muted-foreground" : "bg-muted/40",
+        )}>
+          {displayValue}
+          {status === "edited" && (
+            <span className="ml-2 text-xs text-blue-500 font-bold">(edited)</span>
+          )}
+          {axis.also && axis.also.length > 0 && (
+            <span className="ml-2 text-xs text-muted-foreground">(also: {axis.also.join(", ")})</span>
+          )}
+        </div>
+      ) : (
+        <div className="mb-2 space-y-2">
+          {isMultiValue ? (
+            <Input
+              value={editValue}
+              onChange={e => onEdit(e.target.value)}
+              className="text-sm h-9"
+              placeholder="e.g. transformer, light"
+              autoFocus
+            />
+          ) : (
+            <select
+              value={editValue}
+              onChange={e => onEdit(e.target.value)}
+              className="w-full text-sm h-9 border border-input bg-background rounded-md px-2 focus:outline-none focus:ring-1 focus:ring-ring"
+              autoFocus
+            >
+              <option value="">— Select —</option>
+              {options.map(o => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          )}
+          <Button size="sm" onClick={handleCommit} className="h-7 text-xs">Save</Button>
+        </div>
+      )}
+
+      {/* Catalog match badge */}
+      {axis.catalogMatch && (
+        <div className="mb-2 flex items-center gap-1.5">
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-600 border border-indigo-400/30 font-semibold">
+            Catalog: {axis.catalogMatch.name}
+          </span>
+          <span className="text-[10px] text-muted-foreground">{Math.round(axis.catalogMatch.matchScore * 100)}% match</span>
+        </div>
+      )}
+
+      {/* Needs photo banner */}
+      {needsPhotoInfo && (
+        <div className="mb-2 flex items-start gap-2 rounded-lg px-2.5 py-2 bg-amber-500/10 border border-amber-500/30">
+          <Camera className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
+          <div className="min-w-0">
+            <div className="text-[10px] font-bold text-amber-600">{needsPhotoInfo.title}</div>
+            <div className="text-[10px] text-muted-foreground leading-snug">{needsPhotoInfo.description}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Evidence (collapsible) */}
+      {axis.evidence && axis.evidence.length > 0 && (
+        <div className="mb-2">
+          <button
+            className="text-[11px] text-muted-foreground flex items-center gap-1 hover:text-foreground"
+            onClick={() => setEvidenceOpen(v => !v)}
+          >
+            {evidenceOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+            {evidenceOpen ? "Hide" : "Show"} evidence ({axis.evidence.length})
+          </button>
+          {evidenceOpen && (
+            <div className="mt-1.5 space-y-1 border-l-2 border-muted pl-3">
+              {axis.evidence.map((ev, i) => (
+                <div key={i} className="text-[11px] text-muted-foreground">{ev}</div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Actions */}
+      <div className="flex gap-2">
+        <Button
+          size="sm"
+          variant={status === "accepted" ? "default" : "outline"}
+          className={cn("h-8 text-xs gap-1 flex-1", status === "accepted" && "bg-green-600 hover:bg-green-700 border-green-600")}
+          onClick={onAccept}
+          disabled={editing}
+        >
+          <CheckCircle2 className="h-3.5 w-3.5" />
+          Accept
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className={cn("h-8 text-xs gap-1 flex-1", status === "edited" && "border-blue-500 text-blue-500")}
+          onClick={handleEdit}
+          disabled={editing}
+        >
+          <Pencil className="h-3.5 w-3.5" />
+          Edit
+        </Button>
+        <Button
+          size="sm"
+          variant={status === "rejected" ? "destructive" : "outline"}
+          className="h-8 text-xs gap-1 flex-1"
+          onClick={onReject}
+          disabled={editing}
+        >
+          <XCircle className="h-3.5 w-3.5" />
+          Reject
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ── Classification Panel ──────────────────────────────────────────────────────
+interface ClassificationPanelProps {
+  result: ClassificationResult;
+  fieldStatuses: Record<string, FieldStatus>;
+  editValues: Record<string, string>;
+  onSetStatus: (key: string, s: FieldStatus) => void;
+  onSetEdit: (key: string, val: string) => void;
+  onAcceptAll: () => void;
+}
+
+function ClassificationPanel({
+  result, fieldStatuses, editValues, onSetStatus, onSetEdit, onAcceptAll,
+}: ClassificationPanelProps) {
+  const classKeys = ["assetPurpose", "phaseConfiguration", "constructionRole", "equipmentRole", "framingConfiguration"];
+  const allAccepted = classKeys.every(k => fieldStatuses[k] === "accepted");
+
+  return (
+    <Card className="border-border">
+      <CardHeader className="pb-2 pt-4 px-4">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+            Pole Classification
+          </CardTitle>
+          <div className="flex items-center gap-2">
+            {result.overallConfidence > 0 && (
+              <span className={cn(
+                "text-[10px] font-bold px-1.5 py-0.5 rounded border",
+                result.overallConfidence >= 0.75 ? "bg-green-500/15 text-green-600 border-green-400/40"
+                  : result.overallConfidence >= 0.55 ? "bg-yellow-500/15 text-yellow-600 border-yellow-400/40"
+                  : "bg-red-500/15 text-red-600 border-red-400/40",
+              )}>
+                {Math.round(result.overallConfidence * 100)}% overall
+              </span>
+            )}
+            {!allAccepted && (
+              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={onAcceptAll}>
+                <CheckCircle2 className="h-3 w-3 mr-1" /> Accept All
+              </Button>
+            )}
+          </div>
+        </div>
+        <p className="text-[11px] text-muted-foreground mt-1">
+          Five independent classification axes derived from the photo.
+          Corrections save automatically as training examples.
+        </p>
+        {(result.catalogMatchedPoleTypeId || result.catalogMatchedStructureConfigId) && (
+          <div className="flex flex-wrap gap-1.5 mt-1.5">
+            {result.catalogMatchedPoleTypeId && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-600 border border-indigo-400/30 font-semibold">
+                PKB Pole Type matched
+              </span>
+            )}
+            {result.catalogMatchedStructureConfigId && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-600 border border-indigo-400/30 font-semibold">
+                PKB Structure Config matched
+              </span>
+            )}
+          </div>
+        )}
+      </CardHeader>
+      <CardContent className="px-4 pb-4 space-y-3">
+        <ClassificationAxisCard
+          axisKey="assetPurpose" label="Asset Purpose"
+          icon={<Zap className="h-4 w-4" />}
+          axis={result.assetPurpose as ClassificationAxis<unknown>}
+          status={fieldStatuses["assetPurpose"] ?? "pending"}
+          editValue={editValues["assetPurpose"] ?? ""}
+          onAccept={() => onSetStatus("assetPurpose", "accepted")}
+          onReject={() => onSetStatus("assetPurpose", "rejected")}
+          onEdit={v => onSetEdit("assetPurpose", v)}
+          onCommitEdit={() => onSetStatus("assetPurpose", "edited")}
+        />
+        <ClassificationAxisCard
+          axisKey="phaseConfiguration" label="Phase Configuration"
+          icon={<Layers className="h-4 w-4" />}
+          axis={result.phaseConfiguration as ClassificationAxis<unknown>}
+          status={fieldStatuses["phaseConfiguration"] ?? "pending"}
+          editValue={editValues["phaseConfiguration"] ?? ""}
+          onAccept={() => onSetStatus("phaseConfiguration", "accepted")}
+          onReject={() => onSetStatus("phaseConfiguration", "rejected")}
+          onEdit={v => onSetEdit("phaseConfiguration", v)}
+          onCommitEdit={() => onSetStatus("phaseConfiguration", "edited")}
+        />
+        <ClassificationAxisCard
+          axisKey="constructionRole" label="Construction Role"
+          icon={<Building2 className="h-4 w-4" />}
+          axis={result.constructionRole as ClassificationAxis<unknown>}
+          status={fieldStatuses["constructionRole"] ?? "pending"}
+          editValue={editValues["constructionRole"] ?? ""}
+          onAccept={() => onSetStatus("constructionRole", "accepted")}
+          onReject={() => onSetStatus("constructionRole", "rejected")}
+          onEdit={v => onSetEdit("constructionRole", v)}
+          onCommitEdit={() => onSetStatus("constructionRole", "edited")}
+        />
+        <ClassificationAxisCard
+          axisKey="equipmentRole" label="Equipment Roles"
+          icon={<Wrench className="h-4 w-4" />}
+          axis={result.equipmentRole as ClassificationAxis<unknown>}
+          isMultiValue
+          status={fieldStatuses["equipmentRole"] ?? "pending"}
+          editValue={editValues["equipmentRole"] ?? ""}
+          onAccept={() => onSetStatus("equipmentRole", "accepted")}
+          onReject={() => onSetStatus("equipmentRole", "rejected")}
+          onEdit={v => onSetEdit("equipmentRole", v)}
+          onCommitEdit={() => onSetStatus("equipmentRole", "edited")}
+        />
+        <ClassificationAxisCard
+          axisKey="framingConfiguration" label="Framing Configuration"
+          icon={<Cpu className="h-4 w-4" />}
+          axis={result.framingConfiguration as ClassificationAxis<unknown>}
+          status={fieldStatuses["framingConfiguration"] ?? "pending"}
+          editValue={editValues["framingConfiguration"] ?? ""}
+          onAccept={() => onSetStatus("framingConfiguration", "accepted")}
+          onReject={() => onSetStatus("framingConfiguration", "rejected")}
+          onEdit={v => onSetEdit("framingConfiguration", v)}
+          onCommitEdit={() => onSetStatus("framingConfiguration", "edited")}
+        />
+      </CardContent>
+    </Card>
   );
 }
 
@@ -631,11 +1052,13 @@ export default function PoleAnalysisReviewPage({ id }: Props) {
 
   const fields = analysis?.proposedFields;
 
-  // All field keys we track
+  // All field keys we track (11 core + 5 classification)
   const FIELD_KEYS = [
     "poleTag", "poleMaterial", "poleHeight", "poleClass", "topFramingType",
     "visibleEquipment", "completedWork", "materialsInstalled", "requiredDocs",
     "poleCondition", "hazardsObserved",
+    // Classification axes
+    "assetPurpose", "phaseConfiguration", "constructionRole", "equipmentRole", "framingConfiguration",
   ];
 
   const getStatus = (key: string): FieldStatus => fieldStatuses[key] ?? "pending";
@@ -881,6 +1304,25 @@ export default function PoleAnalysisReviewPage({ id }: Props) {
             onSelectAsset={(assetId) => setSelectedPoleAssetId(assetId)}
             onTakeNewPhoto={() => navigate("/pole-capture")}
           />
+
+          {/* Pole Classification panel — 5 independent axes */}
+          {analysis.classificationResult && (
+            <ClassificationPanel
+              result={analysis.classificationResult}
+              fieldStatuses={fieldStatuses}
+              editValues={editValues}
+              onSetStatus={setStatus}
+              onSetEdit={setEdit}
+              onAcceptAll={() => {
+                const classKeys = ["assetPurpose", "phaseConfiguration", "constructionRole", "equipmentRole", "framingConfiguration"];
+                setFieldStatuses(prev => {
+                  const next = { ...prev };
+                  classKeys.forEach(k => { next[k] = "accepted"; });
+                  return next;
+                });
+              }}
+            />
+          )}
 
           {/* Job match */}
           <JobMatchCard

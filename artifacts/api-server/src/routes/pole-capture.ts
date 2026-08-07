@@ -23,6 +23,9 @@ import {
   reportMaterialsTable,
   photosTable,
   pkbWorkPackagesTable,
+  pkbPoleTypesTable,
+  pkbStructureConfigsTable,
+  pkbTrainingExamplesTable,
 } from "@workspace/db";
 import { requireAuth, type AuthenticatedRequest } from "../middlewares/requireAuth";
 import { openai } from "@workspace/integrations-openai-ai-server";
@@ -39,6 +42,14 @@ import {
   buildVisualDescription,
   type PoleAssetForMatching,
 } from "../lib/pole-identity-engine";
+import {
+  classifyPole,
+  extractClassificationCorrections,
+  extendVisualDescriptionWithClassification,
+  type CatalogPoleType,
+  type CatalogStructureConfig,
+  type ClassificationResult,
+} from "../lib/pole-classification-engine";
 
 const router: IRouter = Router();
 
@@ -88,6 +99,7 @@ function formatAnalysis(a: typeof poleAnalysesTable.$inferSelect) {
     duplicateOfId: a.duplicateOfId,
     poleAssetId: a.poleAssetId,
     identityResult: a.identityResult,
+    classificationResult: a.classificationResult,
     errorMessage: a.errorMessage,
     auditLog: a.auditLog,
     createdAt: a.createdAt.toISOString(),
@@ -115,11 +127,84 @@ Carefully examine the photo and return ONLY a valid JSON object with this exact 
   "materialsInstalled": {"value": [{"name": "exact material name", "qty": 1, "unit": "ea|ft|set|lbs"}], "confidence": 0.0},
   "requiredDocs": {"value": ["photo documentation categories needed: Full Pole, Pole Tag, Top Framing, Transformer, Before Work, After Work, Base, Damage, etc."], "confidence": 0.0},
   "poleCondition": {"value": "good|fair|poor|critical", "confidence": 0.0},
-  "hazardsObserved": {"value": ["list safety hazards: leaning pole, missing guy, wildlife hazard, low clearance, etc. Empty array if none visible."], "confidence": 0.0}
+  "hazardsObserved": {"value": ["list safety hazards: leaning pole, missing guy, wildlife hazard, low clearance, etc. Empty array if none visible."], "confidence": 0.0},
+  "classification": {
+    "assetPurpose": {
+      "primary": "distribution|transmission|streetlight_only|communications|joint_use|unknown",
+      "secondary": ["any additional roles from: streetlight_only, communications, joint_use — empty array if none"],
+      "confidence": 0.0,
+      "evidence": ["brief visual reason 1", "brief visual reason 2"],
+      "needsPhoto": "equipment_closeup|full_pole_view|null"
+    },
+    "phaseConfiguration": {
+      "value": "none|single_phase|two_phase|three_phase|unknown",
+      "confidence": 0.0,
+      "evidence": ["e.g. Three conductors on crossarm, Three pin insulators visible"],
+      "needsPhoto": "conductor_direction|null"
+    },
+    "constructionRole": {
+      "value": "tangent|angle|corner|dead_end|terminal|junction|tap|branch|crossing|service|underground_riser|unknown",
+      "confidence": 0.0,
+      "evidence": ["e.g. Conductors run straight through, No angle guys visible"],
+      "needsPhoto": "conductor_direction|pole_top_closeup|base_closeup|null"
+    },
+    "equipmentRole": {
+      "values": ["zero or more from: light, transformer, transformer_bank, switch, cutout, recloser, sectionalizer, capacitor_bank, regulator, fused_tap"],
+      "confidence": 0.0,
+      "evidence": ["e.g. 25 kVA transformer visible on pole, Street light arm attached"]
+    },
+    "framingConfiguration": {
+      "value": "crossarm|armless|vertical|alley_arm|single_arm|double_arm|custom|unknown",
+      "confidence": 0.0,
+      "evidence": ["e.g. Single horizontal wooden crossarm at pole top"],
+      "needsPhoto": "pole_top_closeup|null"
+    }
+  }
 }
 
-Confidence scale: 0.9+ = clearly visible, 0.7-0.9 = probably correct, 0.5-0.7 = uncertain, <0.5 = guessing.
-Return null for values that truly cannot be determined. Always return valid JSON only.`;
+CLASSIFICATION GUIDE — use visual evidence carefully:
+
+assetPurpose.primary:
+  "streetlight_only" — NO primary voltage conductors visible; pole only has a light arm and low-voltage wiring
+  "distribution"     — Primary conductors at 4-25 kV; distribution transformers, cutouts, or switches present
+  "transmission"     — Very high-voltage conductors (69 kV+); large suspension insulators; tall steel structures
+  "communications"   — Only telecom, cable TV, or fiber attachments; no power conductors at all
+  "joint_use"        — Distribution power conductors PLUS telecom/cable TV attachments from other utilities
+
+phaseConfiguration.value:
+  Count the primary conductors (not the neutral or secondary):
+  "none"         — No primary conductors at all (streetlight-only or service pole)
+  "single_phase" — One primary conductor plus neutral
+  "two_phase"    — Two primary conductors
+  "three_phase"  — Three primary conductors on crossarm or vertically
+  Set needsPhoto="conductor_direction" when conductors are obscured or count is uncertain.
+
+constructionRole.value:
+  "tangent"           — Conductors run straight through; no angle change; down guys only or none
+  "angle"             — Conductors change direction; bisector guys on outside of angle
+  "corner"            — Near-90-degree direction change (special case of angle)
+  "dead_end"          — All conductors terminate here; strain clamps + dead-end insulators; no through conductors
+  "terminal"          — Line end for a lateral or service; similar to dead_end but smaller scale
+  "junction"          — Three or more circuits meet; multiple conductors departing in different directions
+  "tap"               — A lateral circuit taps off a main through circuit; jumpers or tapped insulators visible
+  "underground_riser" — Conductors transition to underground; riser conduit visible at pole base
+  Set needsPhoto="conductor_direction" when tangent vs angle is ambiguous.
+  Set needsPhoto="pole_top_closeup" when dead_end vs tangent is ambiguous.
+  Set needsPhoto="base_closeup" when underground_riser is suspected but base is not visible.
+
+framingConfiguration.value:
+  "crossarm"   — Standard horizontal wood or fiberglass crossarm(s) at pole top
+  "armless"    — No crossarm; pin insulators or polymer insulators mounted directly on pole
+  "vertical"   — Conductors arranged in a vertical column on the pole (no crossarm)
+  "alley_arm"  — Short offset crossarm for tight clearance (alleys, urban sites)
+  "single_arm" — Single arm extension (streetlight arm or single-circuit bracket)
+  "double_arm" — Two crossarms (side by side or stacked)
+  "custom"     — Non-standard or company-specific hardware arrangement
+  Set needsPhoto="pole_top_closeup" when framing cannot be clearly determined.
+
+Confidence: 0.9+ clearly visible · 0.7-0.9 probably correct · 0.5-0.7 uncertain · <0.5 guessing.
+Return null for needsPhoto when the image is sufficient for that classification field.
+Return null for values truly not determinable. Always return valid JSON only.`;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Job matching
@@ -280,7 +365,7 @@ async function runAnalysis(analysisId: number, companyId: number, photoData: str
         },
       ],
       response_format: { type: "json_object" },
-      max_tokens: 1500,
+      max_tokens: 2500,
     });
 
     const raw = response.choices[0]?.message?.content ?? "{}";
@@ -382,6 +467,90 @@ async function runAnalysis(analysisId: number, companyId: number, photoData: str
       ? identityResult.poleAssetId
       : null;
 
+    // ── Pole Classification Engine ──────────────────────────────────────────
+    // Fetch company's PKB catalogs for catalog matching (parallel)
+    const [pkbPoleTypes, pkbStructureConfigs] = await Promise.all([
+      db.select({
+        id: pkbPoleTypesTable.id,
+        name: pkbPoleTypesTable.name,
+        code: pkbPoleTypesTable.code,
+        operationalClass: pkbPoleTypesTable.operationalClass,
+        aliases: pkbPoleTypesTable.aliases,
+        searchKeywords: pkbPoleTypesTable.searchKeywords,
+        constructionStandardNumber: pkbPoleTypesTable.constructionStandardNumber,
+      }).from(pkbPoleTypesTable).where(
+        and(eq(pkbPoleTypesTable.companyId, companyId), eq(pkbPoleTypesTable.isActive, true)),
+      ).limit(100),
+      db.select({
+        id: pkbStructureConfigsTable.id,
+        name: pkbStructureConfigsTable.name,
+        code: pkbStructureConfigsTable.code,
+        phases: pkbStructureConfigsTable.phases,
+        conductorArrangement: pkbStructureConfigsTable.conductorArrangement,
+        crossarmConfig: pkbStructureConfigsTable.crossarmConfig,
+        deadEndConfig: pkbStructureConfigsTable.deadEndConfig,
+        guyingRequirements: pkbStructureConfigsTable.guyingRequirements,
+        constructionStandard: pkbStructureConfigsTable.constructionStandard,
+      }).from(pkbStructureConfigsTable).where(
+        and(eq(pkbStructureConfigsTable.companyId, companyId), eq(pkbStructureConfigsTable.isActive, true)),
+      ).limit(100),
+    ]);
+
+    const classificationResult = classifyPole({
+      ai: (ai.classification ?? {}) as Parameters<typeof classifyPole>[0]["ai"],
+      poleTypes: pkbPoleTypes as CatalogPoleType[],
+      structureConfigs: pkbStructureConfigs as CatalogStructureConfig[],
+    });
+
+    // Append classification axes to proposedFields (5 new fields)
+    const allProposedFields = {
+      ...proposedFields,
+      assetPurpose: {
+        value: classificationResult.assetPurpose.value,
+        also: classificationResult.assetPurpose.also ?? [],
+        confidence: classificationResult.assetPurpose.confidence,
+        source: "ai_vision",
+        evidence: classificationResult.assetPurpose.evidence,
+        needsPhoto: classificationResult.assetPurpose.needsPhoto,
+        catalogMatch: classificationResult.assetPurpose.catalogMatch,
+      },
+      phaseConfiguration: {
+        value: classificationResult.phaseConfiguration.value,
+        confidence: classificationResult.phaseConfiguration.confidence,
+        source: "ai_vision",
+        evidence: classificationResult.phaseConfiguration.evidence,
+        needsPhoto: classificationResult.phaseConfiguration.needsPhoto,
+      },
+      constructionRole: {
+        value: classificationResult.constructionRole.value,
+        confidence: classificationResult.constructionRole.confidence,
+        source: "ai_vision",
+        evidence: classificationResult.constructionRole.evidence,
+        needsPhoto: classificationResult.constructionRole.needsPhoto,
+      },
+      equipmentRole: {
+        value: classificationResult.equipmentRole.value ?? [],
+        confidence: classificationResult.equipmentRole.confidence,
+        source: "ai_vision",
+        evidence: classificationResult.equipmentRole.evidence,
+        needsPhoto: classificationResult.equipmentRole.needsPhoto,
+      },
+      framingConfiguration: {
+        value: classificationResult.framingConfiguration.value,
+        confidence: classificationResult.framingConfiguration.confidence,
+        source: "ai_vision",
+        evidence: classificationResult.framingConfiguration.evidence,
+        needsPhoto: classificationResult.framingConfiguration.needsPhoto,
+        catalogMatch: classificationResult.framingConfiguration.catalogMatch,
+      },
+    };
+
+    // Extend visual fingerprint with classification tokens
+    const extendedVisualDesc = extendVisualDescriptionWithClassification(
+      visualDesc ?? "",
+      classificationResult,
+    ) || null;
+
     // ── Duplicate check ─────────────────────────────────────────────────────
     const dupId = await checkDuplicate(companyId, poleTag, analysisId);
 
@@ -398,17 +567,20 @@ async function runAnalysis(analysisId: number, companyId: number, photoData: str
         matchConfidence: matchConf != null ? String(matchConf) : null,
         matchMethod,
         matchCandidates: candidates,
-        proposedFields,
+        proposedFields: allProposedFields,
         identityResult,
+        classificationResult,
         poleAssetId: identifiedPoleAssetId,
         duplicateOfId: dupId,
         auditLog: appendAuditLog(null, {
           action: "analyzed",
-          detail: `OCR: ${poleTag ?? "none"}, identity: ${identityResult.status}${identifiedPoleAssetId ? ` (asset #${identifiedPoleAssetId})` : ""}, match: ${matchMethod} (${Math.round(matchConf * 100)}%)`,
+          detail: `OCR: ${poleTag ?? "none"}, identity: ${identityResult.status}${identifiedPoleAssetId ? ` (asset #${identifiedPoleAssetId})` : ""}, classification: ${classificationResult.assetPurpose.value ?? "?"} / ${classificationResult.phaseConfiguration.value ?? "?"} / ${classificationResult.constructionRole.value ?? "?"}, match: ${matchMethod} (${Math.round(matchConf * 100)}%)`,
         }),
       })
       .where(eq(poleAnalysesTable.id, analysisId))
       .returning();
+
+    void extendedVisualDesc; // stored in classificationResult; used at confirm time
 
     return updated;
   } catch (err: any) {
@@ -732,18 +904,51 @@ router.post("/pole-capture/:id/confirm", requireAuth, async (req: AuthenticatedR
     })
     .where(eq(poleAnalysesTable.id, id));
 
+  // ── Save classification corrections as training examples ───────────────────
+  // Any edited or rejected classification axis becomes a foreman-reviewed
+  // training example in pkb_training_examples for future model improvement.
+  const classResult = analysis.classificationResult as ClassificationResult | null;
+  if (classResult) {
+    const classificationKeys = ["assetPurpose", "phaseConfiguration", "constructionRole", "equipmentRole", "framingConfiguration"];
+    const hasClassificationCorrections = classificationKeys.some(
+      k => statuses[k] === "edited" || statuses[k] === "rejected",
+    );
+    if (hasClassificationCorrections) {
+      const corrections = extractClassificationCorrections(classResult, statuses, edits);
+      try {
+        await db.insert(pkbTrainingExamplesTable).values({
+          companyId: analysis.companyId,
+          photoIds: [analysis.id],
+          modelSuggestion: {
+            classification: classResult,
+            source: "pole_capture_analysis",
+            analysisId: analysis.id,
+          },
+          foremanCorrections: { corrections, reviewedAt: new Date().toISOString() },
+          foremanReviewedAt: new Date(),
+          status: "foreman_reviewed",
+        });
+      } catch {
+        // Don't fail confirmation if training example insertion fails
+      }
+    }
+  }
+
   // ── Add verified reference photo to pole asset ─────────────────────────────
   // This improves future identifications for the same pole.
   if (resolvedPoleAssetId) {
-    // Build the visual description from confirmed fields (or proposed fallback)
+    // Build visual description from confirmed fields + classification tokens
     const finalFields = (confirmedFields ?? analysis.proposedFields) as Record<string, any> | null;
-    const visualDesc = finalFields
+    const baseVisualDesc = finalFields
       ? buildVisualDescription(
           Object.fromEntries(
             Object.entries(finalFields).map(([k, v]) => [k, { value: v?.value ?? null }]),
           ),
         ) || null
       : null;
+    const visualDesc = classResult && baseVisualDesc != null
+      ? extendVisualDescriptionWithClassification(baseVisualDesc, classResult) || null
+      : baseVisualDesc;
 
     try {
       await db.insert(poleReferencePhotosTable).values({

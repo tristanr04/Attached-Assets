@@ -68,6 +68,12 @@ export const poleAnalysesTable = pgTable("pole_analyses", {
   // Full identity engine output: { status, candidates, requestedCapture, … }
   identityResult: jsonb("identity_result"),
 
+  // ── Pole Classification Engine results ─────────────────────────────────────
+  // Five independent axes: assetPurpose, phaseConfiguration, constructionRole,
+  // equipmentRole, framingConfiguration — each with confidence, evidence,
+  // catalog match, and needsPhoto flag.
+  classificationResult: jsonb("classification_result"),
+
   // ── Duplicate detection ────────────────────────────────────────────────────
   duplicateOfId: integer("duplicate_of_id"),      // FK to pole_analyses.id
 
