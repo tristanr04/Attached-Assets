@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Response } from "express";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import {
   db, dailyReportsTable, companyMembershipsTable, usersTable,
   projectsTable, crewsTable, crewMembersTable, timeEntriesTable,
@@ -13,7 +13,12 @@ import {
   validateSignatureDataUrl,
 } from "../lib/photoDataUrl";
 import { parseDateOnly, parsePositiveId } from "../lib/requestValues";
-import { canAccessReport, canMutateReport, completionUpdate } from "../lib/reportState";
+import {
+  canAccessReport,
+  canMutateReport,
+  completionUpdate,
+  dailyReportLockKey,
+} from "../lib/reportState";
 import { parseDecimalInput, parseLaborHours } from "../lib/numericInput";
 
 const router: IRouter = Router();
@@ -242,19 +247,43 @@ router.post("/reports", requireAuth, async (req: AuthenticatedRequest, res): Pro
 
   const m = await checkAccess(req.clerkUserId, companyId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
+  const foremanId = req.userId ?? m.userId;
+  if (!foremanId) { res.status(403).json({ error: "A linked user profile is required" }); return; }
 
   const values = pickMutableReportFields(req.body);
   delete values.reportDate;
   const referenceError = await normalizeReportReferences(companyId, values);
   if (referenceError) { res.status(400).json({ error: referenceError }); return; }
 
-  const [report] = await db.insert(dailyReportsTable).values({
-    companyId,
-    reportDate,
-    foremanId: req.userId ?? null,
-    ...values,
-  }).returning();
-  res.status(201).json(await enrichReport(report));
+  const result = await db.transaction(async (tx) => {
+    const lockKey = dailyReportLockKey(companyId, foremanId, reportDate);
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${lockKey}))`);
+
+    const [existing] = await tx.select().from(dailyReportsTable)
+      .where(and(
+        eq(dailyReportsTable.companyId, companyId),
+        eq(dailyReportsTable.foremanId, foremanId),
+        eq(dailyReportsTable.reportDate, reportDate),
+      ))
+      .orderBy(desc(dailyReportsTable.id))
+      .limit(1);
+    if (existing) {
+      return { report: existing, created: false };
+    }
+
+    const [created] = await tx.insert(dailyReportsTable).values({
+      companyId,
+      reportDate,
+      foremanId,
+      ...values,
+    }).returning();
+    return { report: created, created: true };
+  });
+
+  if (!result.created) {
+    res.setHeader("Idempotent-Replay", "true");
+  }
+  res.status(result.created ? 201 : 200).json(await enrichReport(result.report));
 });
 
 // ── Get report detail ─────────────────────────────────────────────────────────

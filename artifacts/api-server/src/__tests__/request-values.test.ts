@@ -12,7 +12,12 @@ import {
   validatePhotoDataUrl,
   validateSignatureDataUrl,
 } from "../lib/photoDataUrl";
-import { canAccessReport, canMutateReport, completionUpdate } from "../lib/reportState";
+import {
+  canAccessReport,
+  canMutateReport,
+  completionUpdate,
+  dailyReportLockKey,
+} from "../lib/reportState";
 import { parseDecimalInput, parseLaborHours } from "../lib/numericInput";
 import { normalizeTemplateItems } from "../lib/templateItems";
 
@@ -275,6 +280,31 @@ test("report routes reject partial IDs, invalid dates, and malformed filters", a
   assert.match(reportRoutes, /const companyFilter = cqId === undefined \? null : parsePositiveId\(cqId\)/);
   assert.match(reportRoutes, /Math\.min\(limit, 100\)/);
   assert.match(templateRoutes, /const companyId = parsePositiveId\(req\.query\.companyId\)/);
+});
+
+test("daily report creation uses a stable company, foreman, and date lock key", () => {
+  assert.equal(
+    dailyReportLockKey(4, 12, "2026-08-07"),
+    "daily-report:4:12:2026-08-07",
+  );
+  assert.notEqual(
+    dailyReportLockKey(4, 12, "2026-08-07"),
+    dailyReportLockKey(4, 13, "2026-08-07"),
+  );
+});
+
+test("daily report creation serializes and replays duplicate submissions", async () => {
+  const source = await readFile(
+    new URL("../routes/reports.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(source, /pg_advisory_xact_lock\(hashtext\(\$\{lockKey\}\)\)/);
+  assert.match(source, /eq\(dailyReportsTable\.companyId, companyId\)/);
+  assert.match(source, /eq\(dailyReportsTable\.foremanId, foremanId\)/);
+  assert.match(source, /eq\(dailyReportsTable\.reportDate, reportDate\)/);
+  assert.match(source, /res\.setHeader\("Idempotent-Replay", "true"\)/);
+  assert.match(source, /res\.status\(result\.created \? 201 : 200\)/);
 });
 
 test("report completion is idempotent and preserves the first completion time", () => {

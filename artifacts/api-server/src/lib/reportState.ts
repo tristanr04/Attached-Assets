@@ -1,5 +1,13 @@
 export type ReportMutationRole = "admin" | "supervisor" | "foreman" | string;
 
+export function dailyReportLockKey(
+  companyId: number,
+  foremanId: number,
+  reportDate: string,
+): string {
+  return `daily-report:${companyId}:${foremanId}:${reportDate}`;
+}
+
 export function canAccessReport(
   role: ReportMutationRole,
   membershipUserId: number | null,
