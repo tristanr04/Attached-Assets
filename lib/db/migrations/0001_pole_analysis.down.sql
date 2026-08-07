@@ -1,5 +1,6 @@
 BEGIN;
 
+DROP TABLE IF EXISTS report_pole_facts;
 DROP TABLE IF EXISTS pole_analysis_decisions;
 DROP TABLE IF EXISTS pole_analysis_fields;
 DROP TABLE IF EXISTS pole_analysis_candidates;

@@ -58,9 +58,21 @@ test("confirmation retries replay only the original receipt", () => {
   assert.match(route, /already confirmed by another request/);
 });
 
-test("confirmation records review decisions without applying billing or final report facts", () => {
+test("confirmation projects accepted and edited facts without applying billing", () => {
   assert.doesNotMatch(route, /reportMaterialsTable|reportEquipmentTable|timeEntriesTable/);
   assert.doesNotMatch(route, /update\(dailyReportsTable\)/);
   assert.match(route, /originalValue: field\.value/);
   assert.match(route, /actorUserId: membership\.userId/);
+  assert.match(route, /confirmedFacts = insertedDecisions\.filter\(decision => decision\.action !== "reject"\)/);
+  assert.match(route, /tx\.insert\(reportPoleFactsTable\)/);
+  assert.match(route, /analysisVersion: run\.version/);
+  assert.match(route, /value: decision\.finalValue!/);
+});
+
+test("confirmed fact reads remain report/company scoped and omit billing data", () => {
+  assert.match(route, /\/reports\/:reportId\/pole-facts/);
+  assert.match(route, /eq\(reportPoleFactsTable\.companyId, report\.companyId\)/);
+  assert.match(route, /eq\(reportPoleFactsTable\.reportId, reportId\)/);
+  assert.match(route, /canAccessReport\(membership\.role, membership\.userId, report\.foremanId\)/);
+  assert.doesNotMatch(route, /rate: reportPoleFactsTable|charge: reportPoleFactsTable/);
 });

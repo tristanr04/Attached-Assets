@@ -40,6 +40,7 @@ interface PoleAnalysisReview {
   fields: AnalysisField[];
   limitations: string[];
   confirmedAt: string | null;
+  confirmedFactCount: number;
   canConfirm: boolean;
 }
 
@@ -198,7 +199,7 @@ export default function PoleAnalysisReviewCard({
   if (analysis.status === "foreman_confirmed") {
     return (
       <div className="mx-3 mb-3 flex items-center gap-2 rounded-lg border border-green-500/40 bg-green-500/10 p-3 text-sm font-bold text-green-700 dark:text-green-400">
-        <CheckCircle2 className="h-4 w-4 shrink-0" /> Pole analysis confirmed
+        <CheckCircle2 className="h-4 w-4 shrink-0" /> Pole analysis confirmed — {analysis.confirmedFactCount} report facts saved
       </div>
     );
   }

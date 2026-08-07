@@ -107,6 +107,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS pole_analysis_runs_company_idempotency_uq ON p
 CREATE UNIQUE INDEX IF NOT EXISTS pole_analysis_runs_company_confirmation_idempotency_uq ON pole_analysis_runs(company_id, confirmation_idempotency_key) WHERE confirmation_idempotency_key IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS pole_analysis_runs_company_analysis_key_version_uq ON pole_analysis_runs(company_id, analysis_key, version);
 CREATE UNIQUE INDEX IF NOT EXISTS pole_analysis_runs_company_id_uq ON pole_analysis_runs(company_id, id);
+CREATE UNIQUE INDEX IF NOT EXISTS pole_analysis_runs_scope_id_uq ON pole_analysis_runs(company_id, report_id, photo_id, id);
 
 CREATE TABLE IF NOT EXISTS pole_analysis_candidates (
   id serial PRIMARY KEY,
@@ -146,5 +147,21 @@ CREATE TABLE IF NOT EXISTS pole_analysis_decisions (
   decided_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE UNIQUE INDEX IF NOT EXISTS pole_analysis_decisions_run_field_uq ON pole_analysis_decisions(analysis_run_id, field_key);
+
+CREATE TABLE IF NOT EXISTS report_pole_facts (
+  id serial PRIMARY KEY,
+  company_id integer NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  report_id integer NOT NULL REFERENCES daily_reports(id) ON DELETE CASCADE,
+  photo_id integer NOT NULL REFERENCES photos(id),
+  analysis_run_id integer NOT NULL,
+  analysis_version integer NOT NULL CHECK (analysis_version > 0),
+  field_key text NOT NULL,
+  value jsonb NOT NULL,
+  decision_action text NOT NULL CHECK (decision_action IN ('accept', 'edit')),
+  confirmed_by_user_id integer NOT NULL REFERENCES users(id),
+  confirmed_at timestamptz NOT NULL,
+  CONSTRAINT report_pole_facts_scope_run_fk FOREIGN KEY (company_id, report_id, photo_id, analysis_run_id) REFERENCES pole_analysis_runs(company_id, report_id, photo_id, id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS report_pole_facts_run_field_uq ON report_pole_facts(analysis_run_id, field_key);
 
 COMMIT;

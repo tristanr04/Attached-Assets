@@ -143,6 +143,7 @@ export const poleAnalysisRunsTable = pgTable("pole_analysis_runs", {
     .where(sql`${table.confirmationIdempotencyKey} is not null`),
   uniqueIndex("pole_analysis_runs_company_analysis_key_version_uq").on(table.companyId, table.analysisKey, table.version),
   uniqueIndex("pole_analysis_runs_company_id_uq").on(table.companyId, table.id),
+  uniqueIndex("pole_analysis_runs_scope_id_uq").on(table.companyId, table.reportId, table.photoId, table.id),
   foreignKey({
     name: "pole_analysis_runs_company_profile_fk",
     columns: [table.companyId, table.selectedPoleProfileId],
@@ -208,7 +209,31 @@ export const poleAnalysisDecisionsTable = pgTable("pole_analysis_decisions", {
   check("pole_analysis_decisions_action_allowed", sql`${table.action} in ('accept', 'edit', 'reject')`),
 ]);
 
+export const reportPoleFactsTable = pgTable("report_pole_facts", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull().references(() => companiesTable.id, { onDelete: "cascade" }),
+  reportId: integer("report_id").notNull().references(() => dailyReportsTable.id, { onDelete: "cascade" }),
+  photoId: integer("photo_id").notNull().references(() => photosTable.id),
+  analysisRunId: integer("analysis_run_id").notNull(),
+  analysisVersion: integer("analysis_version").notNull(),
+  fieldKey: text("field_key").notNull(),
+  value: jsonb("value").notNull(),
+  decisionAction: text("decision_action").notNull(),
+  confirmedByUserId: integer("confirmed_by_user_id").notNull().references(() => usersTable.id),
+  confirmedAt: timestamp("confirmed_at", { withTimezone: true }).notNull(),
+}, table => [
+  uniqueIndex("report_pole_facts_run_field_uq").on(table.analysisRunId, table.fieldKey),
+  foreignKey({
+    name: "report_pole_facts_scope_run_fk",
+    columns: [table.companyId, table.reportId, table.photoId, table.analysisRunId],
+    foreignColumns: [poleAnalysisRunsTable.companyId, poleAnalysisRunsTable.reportId, poleAnalysisRunsTable.photoId, poleAnalysisRunsTable.id],
+  }),
+  check("report_pole_facts_version_positive", sql`${table.analysisVersion} > 0`),
+  check("report_pole_facts_decision_allowed", sql`${table.decisionAction} in ('accept', 'edit')`),
+]);
+
 export type PoleProfile = typeof poleProfilesTable.$inferSelect;
 export type PoleTypeCatalogItem = typeof poleTypeCatalogItemsTable.$inferSelect;
 export type PoleAnalysisJob = typeof poleAnalysisJobsTable.$inferSelect;
 export type PoleAnalysisRun = typeof poleAnalysisRunsTable.$inferSelect;
+export type ReportPoleFact = typeof reportPoleFactsTable.$inferSelect;

@@ -8,8 +8,8 @@ const schemaUrl = new URL("../../../../lib/db/src/schema/pole-analysis.ts", impo
 
 test("pole analysis migration is additive and repeat-safe", async () => {
   const source = await readFile(migrationUrl, "utf8");
-  assert.equal(source.match(/CREATE TABLE IF NOT EXISTS/g)?.length, 8);
-  assert.equal(source.match(/CREATE UNIQUE INDEX IF NOT EXISTS/g)?.length, 17);
+  assert.equal(source.match(/CREATE TABLE IF NOT EXISTS/g)?.length, 9);
+  assert.equal(source.match(/CREATE UNIQUE INDEX IF NOT EXISTS/g)?.length, 19);
   assert.doesNotMatch(source, /ALTER TABLE|TRUNCATE|DELETE FROM|DROP TABLE/i);
   assert.match(source, /BEGIN;/);
   assert.match(source, /COMMIT;/);
@@ -31,6 +31,11 @@ test("pole persistence enforces company scope, immutable evidence, versions, and
   assert.match(source, /pole_analysis_runs\(company_id, confirmation_idempotency_key\)/);
   assert.match(source, /confirmed_by_user_id integer REFERENCES users\(id\)/);
   assert.match(source, /pole_analysis_decisions\(analysis_run_id, field_key\)/);
+  assert.match(source, /report_pole_facts\(analysis_run_id, field_key\)/);
+  assert.match(source, /decision_action IN \('accept', 'edit'\)/);
+  assert.match(source, /pole_analysis_runs\(company_id, report_id, photo_id, id\)/);
+  assert.match(source, /report_pole_facts_scope_run_fk/);
+  assert.match(source, /FOREIGN KEY \(company_id, report_id, photo_id, analysis_run_id\)/);
   assert.match(source, /REFERENCES photos\(id\)(?! ON DELETE CASCADE)/);
   assert.match(source, /FOREIGN KEY \(company_id, pole_profile_id\) REFERENCES pole_profiles\(company_id, id\)/);
   assert.match(source, /FOREIGN KEY \(company_id, analysis_run_id\) REFERENCES pole_analysis_runs\(company_id, id\)/);
@@ -47,6 +52,7 @@ test("database schema mirrors migration constraints and exports all pole tables"
     "poleAnalysisCandidatesTable",
     "poleAnalysisFieldsTable",
     "poleAnalysisDecisionsTable",
+    "reportPoleFactsTable",
   ]) assert.match(source, new RegExp(`export const ${table}`));
   assert.match(source, /companyId, table\.idempotencyKey/);
   assert.match(source, /companyId, table\.requestKey/);
@@ -56,6 +62,8 @@ test("database schema mirrors migration constraints and exports all pole tables"
   assert.match(source, /companyId, table\.confirmationIdempotencyKey/);
   assert.match(source, /table\.photoId, table\.version/);
   assert.match(source, /table\.analysisRunId, table\.fieldKey/);
+  assert.match(source, /report_pole_facts/);
+  assert.match(source, /columns: \[table\.companyId, table\.reportId, table\.photoId, table\.analysisRunId\]/);
   assert.equal(source.match(/columns: \[table\.companyId, table\.poleProfileId\]/g)?.length, 2);
   assert.match(source, /columns: \[table\.companyId, table\.analysisRunId\]/);
 });
@@ -64,6 +72,7 @@ test("rollback removes only new pole-analysis tables in dependency-safe order", 
   const source = await readFile(rollbackUrl, "utf8");
   const drops = [...source.matchAll(/DROP TABLE IF EXISTS ([a-z_]+);/g)].map(match => match[1]);
   assert.deepEqual(drops, [
+    "report_pole_facts",
     "pole_analysis_decisions",
     "pole_analysis_fields",
     "pole_analysis_candidates",

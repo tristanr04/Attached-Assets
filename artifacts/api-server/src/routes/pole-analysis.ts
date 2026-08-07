@@ -10,6 +10,7 @@ import {
   poleAnalysisFieldsTable,
   poleAnalysisJobsTable,
   poleAnalysisRunsTable,
+  reportPoleFactsTable,
 } from "@workspace/db";
 
 import {
@@ -67,6 +68,7 @@ async function reviewResponseFor(run: typeof poleAnalysisRunsTable.$inferSelect)
       actorUserId: decision.actorUserId,
       decidedAt: decision.decidedAt,
     })),
+    confirmedFactCount: decisions.filter(decision => decision.action !== "reject").length,
     createdAt: run.createdAt,
     confirmedAt: run.confirmedAt,
   };
@@ -231,6 +233,42 @@ router.post(
       console.error("Pole analysis manual fallback failed", error);
       res.status(409).json({ error: "Could not continue manually; retry with the same request" });
     }
+  },
+);
+
+router.get(
+  "/reports/:reportId/pole-facts",
+  requireAuth,
+  async (req: AuthenticatedRequest, res): Promise<void> => {
+    if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
+    const reportId = parsePositiveId(req.params.reportId);
+    if (reportId === null) { res.status(400).json({ error: "Invalid report identifier" }); return; }
+
+    const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
+    if (!report) { res.status(404).json({ error: "Not found" }); return; }
+    const [membership] = await db.select().from(companyMembershipsTable).where(and(
+      eq(companyMembershipsTable.companyId, report.companyId),
+      eq(companyMembershipsTable.clerkUserId, req.clerkUserId),
+    ));
+    if (!membership || !canAccessReport(membership.role, membership.userId, report.foremanId)) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
+
+    const facts = await db.select({
+      photoId: reportPoleFactsTable.photoId,
+      analysisRunId: reportPoleFactsTable.analysisRunId,
+      analysisVersion: reportPoleFactsTable.analysisVersion,
+      fieldKey: reportPoleFactsTable.fieldKey,
+      value: reportPoleFactsTable.value,
+      decisionAction: reportPoleFactsTable.decisionAction,
+      confirmedByUserId: reportPoleFactsTable.confirmedByUserId,
+      confirmedAt: reportPoleFactsTable.confirmedAt,
+    }).from(reportPoleFactsTable).where(and(
+      eq(reportPoleFactsTable.companyId, report.companyId),
+      eq(reportPoleFactsTable.reportId, reportId),
+    )).orderBy(desc(reportPoleFactsTable.confirmedAt), desc(reportPoleFactsTable.analysisRunId));
+    res.json({ facts });
   },
 );
 
@@ -422,6 +460,22 @@ router.post(
             };
           }),
         ).returning();
+
+        const confirmedFacts = insertedDecisions.filter(decision => decision.action !== "reject");
+        if (confirmedFacts.length > 0) {
+          await tx.insert(reportPoleFactsTable).values(confirmedFacts.map(decision => ({
+            companyId: report.companyId,
+            reportId,
+            photoId,
+            analysisRunId,
+            analysisVersion: run.version,
+            fieldKey: decision.fieldKey,
+            value: decision.finalValue!,
+            decisionAction: decision.action,
+            confirmedByUserId: membership.userId!,
+            confirmedAt,
+          })));
+        }
 
         const [updated] = await tx.update(poleAnalysisRunsTable).set({
           status: confirmation.status,

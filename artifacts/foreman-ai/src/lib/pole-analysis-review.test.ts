@@ -55,4 +55,6 @@ test("pole review UI retains narrow-screen and explicit human-authority controls
   assert.match(source, /No AI values were applied/);
   assert.match(source, /h-12 w-full/);
   assert.match(source, /refetchInterval/);
+  assert.match(source, /confirmedFactCount/);
+  assert.match(source, /report facts saved/);
 });
