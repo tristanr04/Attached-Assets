@@ -8,6 +8,7 @@ import {
 } from "../lib/requestValues";
 import { pickMutableReportFields } from "../lib/reportInput";
 import { validatePhotoDataUrl } from "../lib/photoDataUrl";
+import { canMutateReport, completionUpdate } from "../lib/reportState";
 
 test("parsePositiveId accepts only canonical positive integer strings", () => {
   assert.equal(parsePositiveId("1"), 1);
@@ -172,5 +173,39 @@ test("company role authorization is scoped to the authenticated Clerk user", asy
   assert.doesNotMatch(
     source,
     /\.where\(eq\(companyMembershipsTable\.companyId, companyId\)\)/,
+  );
+});
+
+test("completed reports are locked for foremen but remain amendable by reviewers", () => {
+  assert.equal(canMutateReport("draft", "foreman"), true);
+  assert.equal(canMutateReport("complete", "foreman"), false);
+  assert.equal(canMutateReport("complete", "supervisor"), true);
+  assert.equal(canMutateReport("complete", "admin"), true);
+});
+
+test("report completion is idempotent and preserves the first completion time", () => {
+  const now = new Date("2026-08-07T00:00:00.000Z");
+  const original = new Date("2026-08-06T23:00:00.000Z");
+
+  assert.deepEqual(completionUpdate("draft", null, now), {
+    status: "complete",
+    completedAt: now,
+  });
+  assert.equal(completionUpdate("complete", original, now), null);
+});
+
+test("all report child mutation routes enforce the completion lock", async () => {
+  const source = await readFile(
+    new URL("../routes/reports.ts", import.meta.url),
+    "utf8",
+  );
+  const guards = source.match(/rejectLockedReport\(report, m\.role, res\)/g);
+
+  // Report patch plus labor, material, equipment, photo, and signature writes.
+  assert.equal(guards?.length, 14);
+  assert.match(source, /const update = completionUpdate\(/);
+  assert.match(
+    source,
+    /eq\(dailyReportsTable\.status, report\.status\)/,
   );
 });

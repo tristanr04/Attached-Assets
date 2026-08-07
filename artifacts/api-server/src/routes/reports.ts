@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Response } from "express";
 import { eq, and, desc } from "drizzle-orm";
 import {
   db, dailyReportsTable, companyMembershipsTable, usersTable,
@@ -9,6 +9,7 @@ import { requireAuth, type AuthenticatedRequest } from "../middlewares/requireAu
 import { pickMutableReportFields } from "../lib/reportInput";
 import { validatePhotoDataUrl } from "../lib/photoDataUrl";
 import { parsePositiveId } from "../lib/requestValues";
+import { canMutateReport, completionUpdate } from "../lib/reportState";
 
 const router: IRouter = Router();
 
@@ -16,6 +17,19 @@ async function checkAccess(clerkUserId: string, companyId: number) {
   const [m] = await db.select().from(companyMembershipsTable)
     .where(and(eq(companyMembershipsTable.companyId, companyId), eq(companyMembershipsTable.clerkUserId, clerkUserId)));
   return m;
+}
+
+function rejectLockedReport(
+  report: typeof dailyReportsTable.$inferSelect,
+  role: string,
+  res: Response,
+): boolean {
+  if (canMutateReport(report.status, role)) {
+    return false;
+  }
+
+  res.status(403).json({ error: "Cannot modify a completed report" });
+  return true;
 }
 
 async function normalizeReportReferences(
@@ -210,7 +224,7 @@ router.patch("/reports/:reportId", requireAuth, async (req: AuthenticatedRequest
 
   const m = await checkAccess(req.clerkUserId, report.companyId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
-  if (report.status === "complete" && m.role === "foreman") { res.status(403).json({ error: "Cannot edit completed report" }); return; }
+  if (rejectLockedReport(report, m.role, res)) { return; }
 
   const updates = pickMutableReportFields(req.body);
   const referenceError = await normalizeReportReferences(report.companyId, updates);
@@ -247,9 +261,25 @@ router.post("/reports/:reportId/complete", requireAuth, async (req: Authenticate
   const m = await checkAccess(req.clerkUserId, report.companyId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
 
+  const update = completionUpdate(report.status, report.completedAt, new Date());
+  if (!update) {
+    res.json(await enrichReport(report));
+    return;
+  }
+
   const [updated] = await db.update(dailyReportsTable)
-    .set({ status: "complete", completedAt: new Date() })
-    .where(eq(dailyReportsTable.id, reportId)).returning();
+    .set(update)
+    .where(and(
+      eq(dailyReportsTable.id, reportId),
+      eq(dailyReportsTable.status, report.status),
+    )).returning();
+  if (!updated) {
+    const [current] = await db.select().from(dailyReportsTable)
+      .where(eq(dailyReportsTable.id, reportId));
+    if (!current) { res.status(404).json({ error: "Not found" }); return; }
+    res.json(await enrichReport(current));
+    return;
+  }
   res.json(await enrichReport(updated));
 });
 
@@ -272,6 +302,7 @@ router.post("/reports/:reportId/time-entries", requireAuth, async (req: Authenti
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
   const m = await checkAccess(req.clerkUserId, report.companyId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
+  if (rejectLockedReport(report, m.role, res)) { return; }
 
   const { employeeName, trade, regularHours, overtimeHours, doubleTimeHours, crewMemberId } = req.body;
   if (!employeeName || !trade) { res.status(400).json({ error: "employeeName and trade are required" }); return; }
@@ -294,6 +325,7 @@ router.patch("/reports/:reportId/time-entries/:entryId", requireAuth, async (req
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
   const m = await checkAccess(req.clerkUserId, report.companyId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
+  if (rejectLockedReport(report, m.role, res)) { return; }
 
   const { employeeName, trade, regularHours, overtimeHours, doubleTimeHours } = req.body;
   const updates: Record<string, unknown> = {};
@@ -317,6 +349,7 @@ router.delete("/reports/:reportId/time-entries/:entryId", requireAuth, async (re
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
   const m = await checkAccess(req.clerkUserId, report.companyId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
+  if (rejectLockedReport(report, m.role, res)) { return; }
   await db.delete(timeEntriesTable).where(and(eq(timeEntriesTable.id, entryId), eq(timeEntriesTable.reportId, reportId)));
   res.sendStatus(204);
 });
@@ -340,6 +373,7 @@ router.post("/reports/:reportId/materials", requireAuth, async (req: Authenticat
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
   const m = await checkAccess(req.clerkUserId, report.companyId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
+  if (rejectLockedReport(report, m.role, res)) { return; }
   const { name, quantity, unit, notes, catalogMaterialId } = req.body;
   if (!name || quantity == null || !unit) { res.status(400).json({ error: "name, quantity, unit required" }); return; }
   const [mat] = await db.insert(reportMaterialsTable).values({ reportId, name, quantity: String(quantity), unit, notes: notes ?? null, catalogMaterialId: catalogMaterialId ?? null }).returning();
@@ -354,6 +388,7 @@ router.patch("/reports/:reportId/materials/:materialId", requireAuth, async (req
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
   const m = await checkAccess(req.clerkUserId, report.companyId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
+  if (rejectLockedReport(report, m.role, res)) { return; }
   const { name, quantity, unit, notes } = req.body;
   const updates: Record<string, unknown> = {};
   if (name !== undefined) updates.name = name;
@@ -374,6 +409,7 @@ router.delete("/reports/:reportId/materials/:materialId", requireAuth, async (re
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
   const m = await checkAccess(req.clerkUserId, report.companyId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
+  if (rejectLockedReport(report, m.role, res)) { return; }
   await db.delete(reportMaterialsTable).where(and(eq(reportMaterialsTable.id, materialId), eq(reportMaterialsTable.reportId, reportId)));
   res.sendStatus(204);
 });
@@ -397,6 +433,7 @@ router.post("/reports/:reportId/equipment", requireAuth, async (req: Authenticat
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
   const m = await checkAccess(req.clerkUserId, report.companyId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
+  if (rejectLockedReport(report, m.role, res)) { return; }
   const { name, hoursUsed, notes, unitId, catalogEquipmentId } = req.body;
   if (!name) { res.status(400).json({ error: "name is required" }); return; }
   const [equip] = await db.insert(reportEquipmentTable).values({
@@ -414,6 +451,7 @@ router.patch("/reports/:reportId/equipment/:equipmentId", requireAuth, async (re
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
   const m = await checkAccess(req.clerkUserId, report.companyId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
+  if (rejectLockedReport(report, m.role, res)) { return; }
   const { name, hoursUsed, notes, unitId } = req.body;
   const updates: Record<string, unknown> = {};
   if (name !== undefined) updates.name = name;
@@ -434,6 +472,7 @@ router.delete("/reports/:reportId/equipment/:equipmentId", requireAuth, async (r
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
   const m = await checkAccess(req.clerkUserId, report.companyId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
+  if (rejectLockedReport(report, m.role, res)) { return; }
   await db.delete(reportEquipmentTable).where(and(eq(reportEquipmentTable.id, equipmentId), eq(reportEquipmentTable.reportId, reportId)));
   res.sendStatus(204);
 });
@@ -457,6 +496,7 @@ router.post("/reports/:reportId/photos", requireAuth, async (req: AuthenticatedR
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
   const m = await checkAccess(req.clerkUserId, report.companyId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
+  if (rejectLockedReport(report, m.role, res)) { return; }
   const { dataUrl, caption, category } = req.body;
   if (!dataUrl) { res.status(400).json({ error: "dataUrl is required" }); return; }
   const photoValidation = validatePhotoDataUrl(dataUrl);
@@ -481,7 +521,7 @@ router.patch("/reports/:reportId/photos/:photoId", requireAuth, async (req: Auth
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
   const m = await checkAccess(req.clerkUserId, report.companyId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
-  if (report.status === "complete" && m.role === "foreman") { res.status(403).json({ error: "Cannot edit photos on a completed report" }); return; }
+  if (rejectLockedReport(report, m.role, res)) { return; }
   const { caption, category } = req.body;
   const updates: Record<string, unknown> = { updatedAt: new Date() };
   if (caption !== undefined) updates.caption = caption;
@@ -500,6 +540,7 @@ router.delete("/reports/:reportId/photos/:photoId", requireAuth, async (req: Aut
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
   const m = await checkAccess(req.clerkUserId, report.companyId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
+  if (rejectLockedReport(report, m.role, res)) { return; }
   const [deleted] = await db.delete(photosTable).where(and(eq(photosTable.id, photoId), eq(photosTable.reportId, reportId))).returning();
   if (!deleted) { res.status(404).json({ error: "Not found" }); return; }
   res.sendStatus(204);
@@ -513,6 +554,7 @@ router.post("/reports/:reportId/signature", requireAuth, async (req: Authenticat
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
   const m = await checkAccess(req.clerkUserId, report.companyId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
+  if (rejectLockedReport(report, m.role, res)) { return; }
   const { dataUrl } = req.body;
   if (!dataUrl) { res.status(400).json({ error: "dataUrl is required" }); return; }
 
