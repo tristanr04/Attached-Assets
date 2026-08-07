@@ -4,7 +4,7 @@ import {
   db, dailyReportsTable, companyMembershipsTable, usersTable,
   projectsTable, crewsTable, crewMembersTable, timeEntriesTable,
   catalogMaterialsTable, reportMaterialsTable, catalogEquipmentTable,
-  reportEquipmentTable, photosTable, signaturesTable
+  reportEquipmentTable, photosTable, signaturesTable, poleAnalysisRunsTable
 } from "@workspace/db";
 import { requireAuth, type AuthenticatedRequest } from "../middlewares/requireAuth";
 import { pickMutableReportFields } from "../lib/reportInput";
@@ -377,26 +377,42 @@ router.post("/reports/:reportId/complete", requireAuth, async (req: Authenticate
   const m = await checkAccess(req.clerkUserId, report.companyId, report.foremanId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
 
-  const update = completionUpdate(report.status, report.completedAt, new Date());
-  if (!update) {
-    res.json(await enrichReport(report));
-    return;
-  }
-
-  const [updated] = await db.update(dailyReportsTable)
-    .set(update)
-    .where(and(
-      eq(dailyReportsTable.id, reportId),
-      eq(dailyReportsTable.status, report.status),
-    )).returning();
-  if (!updated) {
-    const [current] = await db.select().from(dailyReportsTable)
+  const outcome = await db.transaction(async tx => {
+    await tx.execute(sql`select id from daily_reports where id = ${reportId} for update`);
+    const [current] = await tx.select().from(dailyReportsTable)
       .where(eq(dailyReportsTable.id, reportId));
-    if (!current) { res.status(404).json({ error: "Not found" }); return; }
-    res.json(await enrichReport(current));
-    return;
-  }
-  res.json(await enrichReport(updated));
+    if (!current) return { code: 404 as const, error: "Not found" };
+
+    const update = completionUpdate(current.status, current.completedAt, new Date());
+    if (!update) return { code: 200 as const, report: current };
+
+    const [pendingAnalysis] = await tx.select({ id: poleAnalysisRunsTable.id })
+      .from(poleAnalysisRunsTable)
+      .where(and(
+        eq(poleAnalysisRunsTable.companyId, current.companyId),
+        eq(poleAnalysisRunsTable.reportId, reportId),
+        eq(poleAnalysisRunsTable.status, "ai_proposed"),
+      ))
+      .limit(1);
+    if (pendingAnalysis) {
+      return {
+        code: 409 as const,
+        error: "Review and confirm or reject the pending pole analysis before submitting this report",
+      };
+    }
+
+    const [updated] = await tx.update(dailyReportsTable)
+      .set(update)
+      .where(and(
+        eq(dailyReportsTable.id, reportId),
+        eq(dailyReportsTable.status, current.status),
+      )).returning();
+    if (!updated) throw new Error("Report changed during completion");
+    return { code: 200 as const, report: updated };
+  });
+
+  if ("error" in outcome) { res.status(outcome.code).json({ error: outcome.error }); return; }
+  res.status(outcome.code).json(await enrichReport(outcome.report));
 });
 
 // ── Time entries ──────────────────────────────────────────────────────────────

@@ -418,6 +418,24 @@ test("report completion is idempotent and preserves the first completion time", 
   assert.equal(completionUpdate("complete", original, now), null);
 });
 
+test("report completion serializes with pole confirmation and blocks pending AI proposals", async () => {
+  const source = await readFile(
+    new URL("../routes/reports.ts", import.meta.url),
+    "utf8",
+  );
+  const completionRoute = source.slice(
+    source.indexOf('router.post("/reports/:reportId/complete"'),
+    source.indexOf("// ── Time entries"),
+  );
+
+  assert.match(completionRoute, /db\.transaction/);
+  assert.match(completionRoute, /select id from daily_reports where id = \$\{reportId\} for update/);
+  assert.match(completionRoute, /eq\(poleAnalysisRunsTable\.companyId, current\.companyId\)/);
+  assert.match(completionRoute, /eq\(poleAnalysisRunsTable\.reportId, reportId\)/);
+  assert.match(completionRoute, /eq\(poleAnalysisRunsTable\.status, "ai_proposed"\)/);
+  assert.match(completionRoute, /Review and confirm or reject the pending pole analysis/);
+});
+
 test("all report child mutation routes enforce the completion lock", async () => {
   const source = await readFile(
     new URL("../routes/reports.ts", import.meta.url),
@@ -430,7 +448,7 @@ test("all report child mutation routes enforce the completion lock", async () =>
   assert.match(source, /const update = completionUpdate\(/);
   assert.match(
     source,
-    /eq\(dailyReportsTable\.status, report\.status\)/,
+    /eq\(dailyReportsTable\.status, current\.status\)/,
   );
 });
 
