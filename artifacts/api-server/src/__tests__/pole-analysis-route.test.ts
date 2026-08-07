@@ -13,6 +13,15 @@ test("pole analysis confirmation is authenticated, foreman-owned, and report/pho
   assert.match(route, /eq\(poleAnalysisRunsTable\.photoId, photoId\)/);
 });
 
+test("review reads enforce report access and return structured evidence without raw provider output", () => {
+  assert.match(route, /canAccessReport\(membership\.role, membership\.userId, report\.foremanId\)/);
+  assert.match(route, /poleAnalysisCandidatesTable/);
+  assert.match(route, /targetEvidence: run\.targetEvidence/);
+  assert.match(route, /reviewRequirement: field\.reviewRequirement/);
+  assert.match(route, /signalEvidence: candidate\.signalEvidence/);
+  assert.doesNotMatch(route, /rawResult: run\.rawResult/);
+});
+
 test("pole analysis confirmation serializes writers and preserves completed-report locks", () => {
   assert.equal((route.match(/for update/g) ?? []).length, 2);
   assert.match(route, /report\.status !== "draft"/);
