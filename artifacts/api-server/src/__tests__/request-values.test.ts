@@ -21,6 +21,7 @@ import {
 import { parseDecimalInput, parseLaborHours } from "../lib/numericInput";
 import { normalizeTemplateItems } from "../lib/templateItems";
 import { applicationLockKey, parseIdempotencyKey } from "../lib/idempotency";
+import { canManageCrew } from "../lib/crewAccess";
 
 test("parsePositiveId accepts only canonical positive integer strings", () => {
   assert.equal(parsePositiveId("1"), 1);
@@ -243,6 +244,30 @@ test("foremen can access only their own reports while reviewers retain company a
   assert.equal(canAccessReport("supervisor", 10, 11), true);
   assert.equal(canAccessReport("admin", 10, 11), true);
   assert.equal(canAccessReport("unknown", 10, 10), false);
+});
+
+test("foremen can manage only their assigned crew while reviewers retain company access", () => {
+  assert.equal(canManageCrew("foreman", 10, 10), true);
+  assert.equal(canManageCrew("foreman", 10, 11), false);
+  assert.equal(canManageCrew("foreman", null, 10), false);
+  assert.equal(canManageCrew("supervisor", 10, 11), true);
+  assert.equal(canManageCrew("admin", 10, 11), true);
+  assert.equal(canManageCrew("unknown", 10, 10), false);
+});
+
+test("crew routes reject ambiguous IDs and company-scope user references", async () => {
+  const source = await readFile(
+    new URL("../routes/crews.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.doesNotMatch(source, /parseInt\(/);
+  assert.match(source, /inArray\(crewsTable\.companyId, ids\)/);
+  assert.match(source, /eq\(companyMembershipsTable\.companyId, companyId\)/);
+  assert.match(source, /eq\(companyMembershipsTable\.userId, userId\)/);
+  assert.equal(source.match(/canManageCrew\(membership\.role, membership\.userId, crew\.foremanId\)/g)?.length, 3);
+  assert.match(source, /foremanId must belong to the crew company/);
+  assert.match(source, /userId must belong to the crew company/);
 });
 
 test("report and template routes enforce foreman ownership", async () => {
