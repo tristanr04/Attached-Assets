@@ -7,6 +7,7 @@ import {
 } from "@workspace/db";
 import { requireAuth, type AuthenticatedRequest } from "../middlewares/requireAuth";
 import { parsePositiveId } from "../lib/requestValues";
+import { canMutateReport } from "../lib/reportState";
 
 const router: IRouter = Router();
 
@@ -105,6 +106,10 @@ router.post("/report-templates/:id/apply", requireAuth, async (req: Authenticate
 
   const m = await checkAccess(req.clerkUserId, template.companyId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
+  if (!canMutateReport(report.status, m.role)) {
+    res.status(403).json({ error: "Cannot apply a template to a completed report" });
+    return;
+  }
 
   // Apply template fields to report (only if not already set)
   const reportUpdates: Record<string, unknown> = {};
@@ -115,46 +120,46 @@ router.post("/report-templates/:id/apply", requireAuth, async (req: Authenticate
   if (!report.safetyNotes && template.defaultSafetyNotes) reportUpdates.safetyNotes = template.defaultSafetyNotes;
   if (!report.additionalNotes && template.defaultNotes) reportUpdates.additionalNotes = template.defaultNotes;
 
-  if (Object.keys(reportUpdates).length > 0) {
-    await db.update(dailyReportsTable).set(reportUpdates).where(eq(dailyReportsTable.id, reportId));
-  }
-
-  // Add labor items from template
   const laborItems = Array.isArray(template.laborItems) ? template.laborItems as Array<Record<string, unknown>> : [];
-  for (const item of laborItems) {
-    await db.insert(timeEntriesTable).values({
-      reportId,
-      employeeName: String(item.name ?? ""),
-      trade: String(item.trade ?? ""),
-      regularHours: "0", overtimeHours: "0", doubleTimeHours: "0",
-      stormHours: "0", travelHours: "0", perDiemDays: "0",
-      laborClassificationId: item.laborClassificationId ? Number(item.laborClassificationId) : null,
-    });
-  }
-
-  // Add equipment items from template
   const equipmentItems = Array.isArray(template.equipmentItems) ? template.equipmentItems as Array<Record<string, unknown>> : [];
-  for (const item of equipmentItems) {
-    await db.insert(reportEquipmentTable).values({
-      reportId,
-      name: String(item.name ?? ""),
-      catalogEquipmentId: item.catalogEquipmentId ? Number(item.catalogEquipmentId) : null,
-      hoursUsed: String(item.hours ?? "0"),
-      quantity: String(item.quantity ?? "1"),
-    });
-  }
-
-  // Add material items from template
   const materialItems = Array.isArray(template.materialItems) ? template.materialItems as Array<Record<string, unknown>> : [];
-  for (const item of materialItems) {
-    await db.insert(reportMaterialsTable).values({
-      reportId,
-      name: String(item.name ?? ""),
-      quantity: String(item.quantity ?? "0"),
-      unit: String(item.unit ?? "each"),
-      catalogMaterialId: item.catalogMaterialId ? Number(item.catalogMaterialId) : null,
-    });
-  }
+
+  await db.transaction(async (tx) => {
+    if (Object.keys(reportUpdates).length > 0) {
+      await tx.update(dailyReportsTable).set(reportUpdates).where(eq(dailyReportsTable.id, reportId));
+    }
+
+    for (const item of laborItems) {
+      await tx.insert(timeEntriesTable).values({
+        reportId,
+        employeeName: String(item.name ?? ""),
+        trade: String(item.trade ?? ""),
+        regularHours: "0", overtimeHours: "0", doubleTimeHours: "0",
+        stormHours: "0", travelHours: "0", perDiemDays: "0",
+        laborClassificationId: item.laborClassificationId ? Number(item.laborClassificationId) : null,
+      });
+    }
+
+    for (const item of equipmentItems) {
+      await tx.insert(reportEquipmentTable).values({
+        reportId,
+        name: String(item.name ?? ""),
+        catalogEquipmentId: item.catalogEquipmentId ? Number(item.catalogEquipmentId) : null,
+        hoursUsed: String(item.hours ?? "0"),
+        quantity: String(item.quantity ?? "1"),
+      });
+    }
+
+    for (const item of materialItems) {
+      await tx.insert(reportMaterialsTable).values({
+        reportId,
+        name: String(item.name ?? ""),
+        quantity: String(item.quantity ?? "0"),
+        unit: String(item.unit ?? "each"),
+        catalogMaterialId: item.catalogMaterialId ? Number(item.catalogMaterialId) : null,
+      });
+    }
+  });
 
   res.json({ success: true, appliedFields: Object.keys(reportUpdates), addedLabor: laborItems.length, addedEquipment: equipmentItems.length, addedMaterials: materialItems.length });
 });
@@ -299,39 +304,45 @@ router.post("/work-package-templates/:id/apply", requireAuth, async (req: Authen
 
   const m = await checkAccess(req.clerkUserId, wp.companyId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
+  if (!canMutateReport(report.status, m.role)) {
+    res.status(403).json({ error: "Cannot apply a work package to a completed report" });
+    return;
+  }
 
   const laborItems = Array.isArray(wp.laborItems) ? wp.laborItems as Array<Record<string, unknown>> : [];
   const equipmentItems = Array.isArray(wp.equipmentItems) ? wp.equipmentItems as Array<Record<string, unknown>> : [];
   const materialItems = Array.isArray(wp.materialItems) ? wp.materialItems as Array<Record<string, unknown>> : [];
 
-  for (const item of laborItems) {
-    await db.insert(timeEntriesTable).values({
-      reportId, employeeName: String(item.name ?? "TBD"), trade: String(item.trade ?? ""),
-      regularHours: String(item.hours ?? "0"), overtimeHours: "0", doubleTimeHours: "0",
-      stormHours: "0", travelHours: "0", perDiemDays: "0",
-      laborClassificationId: item.laborClassificationId ? Number(item.laborClassificationId) : null,
-    });
-  }
+  await db.transaction(async (tx) => {
+    for (const item of laborItems) {
+      await tx.insert(timeEntriesTable).values({
+        reportId, employeeName: String(item.name ?? "TBD"), trade: String(item.trade ?? ""),
+        regularHours: String(item.hours ?? "0"), overtimeHours: "0", doubleTimeHours: "0",
+        stormHours: "0", travelHours: "0", perDiemDays: "0",
+        laborClassificationId: item.laborClassificationId ? Number(item.laborClassificationId) : null,
+      });
+    }
 
-  for (const item of equipmentItems) {
-    await db.insert(reportEquipmentTable).values({
-      reportId, name: String(item.name ?? ""),
-      catalogEquipmentId: item.catalogEquipmentId ? Number(item.catalogEquipmentId) : null,
-      hoursUsed: String(item.hours ?? "0"), quantity: String(item.quantity ?? "1"),
-    });
-  }
+    for (const item of equipmentItems) {
+      await tx.insert(reportEquipmentTable).values({
+        reportId, name: String(item.name ?? ""),
+        catalogEquipmentId: item.catalogEquipmentId ? Number(item.catalogEquipmentId) : null,
+        hoursUsed: String(item.hours ?? "0"), quantity: String(item.quantity ?? "1"),
+      });
+    }
 
-  for (const item of materialItems) {
-    await db.insert(reportMaterialsTable).values({
-      reportId, name: String(item.name ?? ""),
-      quantity: String(item.quantity ?? "0"), unit: String(item.unit ?? "each"),
-      catalogMaterialId: item.catalogMaterialId ? Number(item.catalogMaterialId) : null,
-    });
-  }
+    for (const item of materialItems) {
+      await tx.insert(reportMaterialsTable).values({
+        reportId, name: String(item.name ?? ""),
+        quantity: String(item.quantity ?? "0"), unit: String(item.unit ?? "each"),
+        catalogMaterialId: item.catalogMaterialId ? Number(item.catalogMaterialId) : null,
+      });
+    }
 
-  if (wp.defaultNotes && !report.additionalNotes) {
-    await db.update(dailyReportsTable).set({ additionalNotes: wp.defaultNotes }).where(eq(dailyReportsTable.id, reportId));
-  }
+    if (wp.defaultNotes && !report.additionalNotes) {
+      await tx.update(dailyReportsTable).set({ additionalNotes: wp.defaultNotes }).where(eq(dailyReportsTable.id, reportId));
+    }
+  });
 
   res.json({ success: true, addedLabor: laborItems.length, addedEquipment: equipmentItems.length, addedMaterials: materialItems.length });
 });

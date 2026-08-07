@@ -287,3 +287,17 @@ test("labor hour buckets cannot exceed one day in total", () => {
     doubleTimeHours: 1,
   }), null);
 });
+
+test("template and work-package application are atomic and honor report locks", async () => {
+  const source = await readFile(
+    new URL("../routes/report-templates.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.equal(source.match(/await db\.transaction\(async \(tx\)/g)?.length, 2);
+  assert.equal(source.match(/canMutateReport\(report\.status, m\.role\)/g)?.length, 2);
+  assert.equal(
+    source.match(/await tx\.insert\((?:timeEntriesTable|reportEquipmentTable|reportMaterialsTable)\)/g)?.length,
+    6,
+  );
+});
