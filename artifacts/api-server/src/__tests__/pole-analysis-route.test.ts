@@ -75,4 +75,7 @@ test("confirmed fact reads remain report/company scoped and omit billing data", 
   assert.match(route, /eq\(reportPoleFactsTable\.reportId, reportId\)/);
   assert.match(route, /canAccessReport\(membership\.role, membership\.userId, report\.foremanId\)/);
   assert.doesNotMatch(route, /rate: reportPoleFactsTable|charge: reportPoleFactsTable/);
+  assert.match(route, /partitionPoleFactHistory\(facts\)/);
+  assert.match(route, /Cache-Control", "private, no-store/);
+  assert.match(route, /desc\(reportPoleFactsTable\.id\)/);
 });

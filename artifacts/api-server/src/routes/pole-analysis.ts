@@ -22,6 +22,7 @@ import { requireAuth, type AuthenticatedRequest } from "../middlewares/requireAu
 import { parsePositiveId } from "../lib/requestValues";
 import { parseIdempotencyKey } from "../lib/idempotency";
 import { canAccessReport } from "../lib/reportState";
+import { partitionPoleFactHistory } from "../lib/poleFactHistory";
 
 const router: IRouter = Router();
 
@@ -256,6 +257,7 @@ router.get(
     }
 
     const facts = await db.select({
+      id: reportPoleFactsTable.id,
       photoId: reportPoleFactsTable.photoId,
       analysisRunId: reportPoleFactsTable.analysisRunId,
       analysisVersion: reportPoleFactsTable.analysisVersion,
@@ -267,8 +269,13 @@ router.get(
     }).from(reportPoleFactsTable).where(and(
       eq(reportPoleFactsTable.companyId, report.companyId),
       eq(reportPoleFactsTable.reportId, reportId),
-    )).orderBy(desc(reportPoleFactsTable.confirmedAt), desc(reportPoleFactsTable.analysisRunId));
-    res.json({ facts });
+    )).orderBy(
+      desc(reportPoleFactsTable.confirmedAt),
+      desc(reportPoleFactsTable.analysisRunId),
+      desc(reportPoleFactsTable.id),
+    );
+    res.set("Cache-Control", "private, no-store");
+    res.json(partitionPoleFactHistory(facts));
   },
 );
 
