@@ -4,12 +4,13 @@ import {
   db, reportTemplatesTable, workPackageTemplatesTable, companyMembershipsTable,
   dailyReportsTable, timeEntriesTable, reportMaterialsTable, reportEquipmentTable,
   crewMembersTable, crewsTable, projectsTable, laborClassificationsTable,
-  catalogMaterialsTable, catalogEquipmentTable
+  catalogMaterialsTable, catalogEquipmentTable, activityLogsTable
 } from "@workspace/db";
 import { requireAuth, type AuthenticatedRequest } from "../middlewares/requireAuth";
 import { parseDateOnly, parsePositiveId } from "../lib/requestValues";
 import { canAccessReport, canMutateReport, dailyReportLockKey } from "../lib/reportState";
 import { normalizeTemplateItems } from "../lib/templateItems";
+import { applicationLockKey, parseIdempotencyKey } from "../lib/idempotency";
 
 const router: IRouter = Router();
 
@@ -182,6 +183,8 @@ router.delete("/report-templates/:id", requireAuth, async (req: AuthenticatedReq
 // ── Apply template to a report ────────────────────────────────────────────────
 router.post("/report-templates/:id/apply", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const idempotencyKey = parseIdempotencyKey(req.get("Idempotency-Key"));
+  if (!idempotencyKey) { res.status(400).json({ error: "A valid Idempotency-Key header is required" }); return; }
   const templateId = parsePositiveId(req.params.id);
   const reportId = parsePositiveId(req.body.reportId);
   if (templateId === null || reportId === null) { res.status(400).json({ error: "templateId and reportId required" }); return; }
@@ -198,6 +201,8 @@ router.post("/report-templates/:id/apply", requireAuth, async (req: Authenticate
 
   const m = await checkAccess(req.clerkUserId, template.companyId, report.foremanId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
+  const actorId = req.userId ?? m.userId;
+  if (!actorId) { res.status(403).json({ error: "A linked user profile is required" }); return; }
   if (!canMutateReport(report.status, m.role)) {
     res.status(403).json({ error: "Cannot apply a template to a completed report" });
     return;
@@ -229,7 +234,35 @@ router.post("/report-templates/:id/apply", requireAuth, async (req: Authenticate
   });
   if (referenceError) { res.status(400).json({ error: referenceError }); return; }
 
-  await db.transaction(async (tx) => {
+  const applicationResponse = {
+    success: true,
+    appliedFields: Object.keys(reportUpdates),
+    addedLabor: laborItems.length,
+    addedEquipment: equipmentItems.length,
+    addedMaterials: materialItems.length,
+  };
+  const outcome = await db.transaction(async (tx) => {
+    const lockKey = applicationLockKey("report-template", actorId, reportId, idempotencyKey);
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${lockKey}))`);
+    const [receipt] = await tx.select().from(activityLogsTable)
+      .where(and(
+        eq(activityLogsTable.companyId, template.companyId),
+        eq(activityLogsTable.userId, actorId),
+        eq(activityLogsTable.action, "report_template_applied"),
+        eq(activityLogsTable.entityType, "daily_report"),
+        eq(activityLogsTable.entityId, reportId),
+        sql`${activityLogsTable.details}->>'idempotencyKey' = ${idempotencyKey}`,
+      ))
+      .orderBy(desc(activityLogsTable.id))
+      .limit(1);
+    if (receipt) {
+      const details = receipt.details as { sourceId?: number; response?: typeof applicationResponse } | null;
+      if (details?.sourceId !== templateId) {
+        return { conflict: true as const };
+      }
+      return { conflict: false as const, replayed: true, response: details.response ?? applicationResponse };
+    }
+
     if (Object.keys(reportUpdates).length > 0) {
       await tx.update(dailyReportsTable).set(reportUpdates).where(eq(dailyReportsTable.id, reportId));
     }
@@ -264,9 +297,26 @@ router.post("/report-templates/:id/apply", requireAuth, async (req: Authenticate
         catalogMaterialId: item.catalogMaterialId ? Number(item.catalogMaterialId) : null,
       });
     }
+
+    await tx.insert(activityLogsTable).values({
+      companyId: template.companyId,
+      userId: actorId,
+      action: "report_template_applied",
+      entityType: "daily_report",
+      entityId: reportId,
+      details: { idempotencyKey, sourceId: templateId, response: applicationResponse },
+    });
+    return { conflict: false as const, replayed: false, response: applicationResponse };
   });
 
-  res.json({ success: true, appliedFields: Object.keys(reportUpdates), addedLabor: laborItems.length, addedEquipment: equipmentItems.length, addedMaterials: materialItems.length });
+  if (outcome.conflict) {
+    res.status(409).json({ error: "Idempotency-Key was already used for a different template" });
+    return;
+  }
+  if (outcome.replayed) {
+    res.setHeader("Idempotent-Replay", "true");
+  }
+  res.json(outcome.response);
 });
 
 // ── Copy report ───────────────────────────────────────────────────────────────
@@ -426,6 +476,8 @@ router.delete("/work-package-templates/:id", requireAuth, async (req: Authentica
 // ── Apply work package to report ──────────────────────────────────────────────
 router.post("/work-package-templates/:id/apply", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const idempotencyKey = parseIdempotencyKey(req.get("Idempotency-Key"));
+  if (!idempotencyKey) { res.status(400).json({ error: "A valid Idempotency-Key header is required" }); return; }
   const wpId = parsePositiveId(req.params.id);
   const reportId = parsePositiveId(req.body.reportId);
   if (wpId === null || reportId === null) { res.status(400).json({ error: "id and reportId required" }); return; }
@@ -442,6 +494,8 @@ router.post("/work-package-templates/:id/apply", requireAuth, async (req: Authen
 
   const m = await checkAccess(req.clerkUserId, wp.companyId, report.foremanId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
+  const actorId = req.userId ?? m.userId;
+  if (!actorId) { res.status(403).json({ error: "A linked user profile is required" }); return; }
   if (!canMutateReport(report.status, m.role)) {
     res.status(403).json({ error: "Cannot apply a work package to a completed report" });
     return;
@@ -462,7 +516,34 @@ router.post("/work-package-templates/:id/apply", requireAuth, async (req: Authen
   });
   if (referenceError) { res.status(400).json({ error: referenceError }); return; }
 
-  await db.transaction(async (tx) => {
+  const applicationResponse = {
+    success: true,
+    addedLabor: laborItems.length,
+    addedEquipment: equipmentItems.length,
+    addedMaterials: materialItems.length,
+  };
+  const outcome = await db.transaction(async (tx) => {
+    const lockKey = applicationLockKey("work-package", actorId, reportId, idempotencyKey);
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${lockKey}))`);
+    const [receipt] = await tx.select().from(activityLogsTable)
+      .where(and(
+        eq(activityLogsTable.companyId, wp.companyId),
+        eq(activityLogsTable.userId, actorId),
+        eq(activityLogsTable.action, "work_package_applied"),
+        eq(activityLogsTable.entityType, "daily_report"),
+        eq(activityLogsTable.entityId, reportId),
+        sql`${activityLogsTable.details}->>'idempotencyKey' = ${idempotencyKey}`,
+      ))
+      .orderBy(desc(activityLogsTable.id))
+      .limit(1);
+    if (receipt) {
+      const details = receipt.details as { sourceId?: number; response?: typeof applicationResponse } | null;
+      if (details?.sourceId !== wpId) {
+        return { conflict: true as const };
+      }
+      return { conflict: false as const, replayed: true, response: details.response ?? applicationResponse };
+    }
+
     for (const item of laborItems) {
       await tx.insert(timeEntriesTable).values({
         reportId, employeeName: String(item.name ?? "TBD"), trade: String(item.trade ?? ""),
@@ -491,9 +572,26 @@ router.post("/work-package-templates/:id/apply", requireAuth, async (req: Authen
     if (wp.defaultNotes && !report.additionalNotes) {
       await tx.update(dailyReportsTable).set({ additionalNotes: wp.defaultNotes }).where(eq(dailyReportsTable.id, reportId));
     }
+
+    await tx.insert(activityLogsTable).values({
+      companyId: wp.companyId,
+      userId: actorId,
+      action: "work_package_applied",
+      entityType: "daily_report",
+      entityId: reportId,
+      details: { idempotencyKey, sourceId: wpId, response: applicationResponse },
+    });
+    return { conflict: false as const, replayed: false, response: applicationResponse };
   });
 
-  res.json({ success: true, addedLabor: laborItems.length, addedEquipment: equipmentItems.length, addedMaterials: materialItems.length });
+  if (outcome.conflict) {
+    res.status(409).json({ error: "Idempotency-Key was already used for a different work package" });
+    return;
+  }
+  if (outcome.replayed) {
+    res.setHeader("Idempotent-Replay", "true");
+  }
+  res.json(outcome.response);
 });
 
 export default router;

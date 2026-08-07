@@ -20,6 +20,7 @@ import {
 } from "../lib/reportState";
 import { parseDecimalInput, parseLaborHours } from "../lib/numericInput";
 import { normalizeTemplateItems } from "../lib/templateItems";
+import { applicationLockKey, parseIdempotencyKey } from "../lib/idempotency";
 
 test("parsePositiveId accepts only canonical positive integer strings", () => {
   assert.equal(parsePositiveId("1"), 1);
@@ -307,6 +308,23 @@ test("daily report creation serializes and replays duplicate submissions", async
   assert.match(source, /res\.status\(result\.created \? 201 : 200\)/);
 });
 
+test("idempotency keys are bounded and safe for durable operation receipts", () => {
+  assert.equal(parseIdempotencyKey("apply-report_2026-08-07.001"), "apply-report_2026-08-07.001");
+  assert.equal(parseIdempotencyKey("12345678"), "12345678");
+  for (const value of [undefined, null, "short", " leading-key", "key with spaces", ["abcdefgh"], "a".repeat(129)]) {
+    assert.equal(parseIdempotencyKey(value), null);
+  }
+
+  assert.equal(
+    applicationLockKey("report-template", 4, 12, "abcdefgh"),
+    "report-template:4:12:abcdefgh",
+  );
+  assert.notEqual(
+    applicationLockKey("report-template", 4, 12, "abcdefgh"),
+    applicationLockKey("work-package", 4, 12, "abcdefgh"),
+  );
+});
+
 test("report completion is idempotent and preserves the first completion time", () => {
   const now = new Date("2026-08-07T00:00:00.000Z");
   const original = new Date("2026-08-06T23:00:00.000Z");
@@ -388,6 +406,21 @@ test("template and work-package application are atomic and honor report locks", 
     source.match(/await tx\.insert\((?:timeEntriesTable|reportEquipmentTable|reportMaterialsTable)\)/g)?.length,
     9,
   );
+});
+
+test("template and work-package retries use durable idempotency receipts", async () => {
+  const source = await readFile(
+    new URL("../routes/report-templates.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.equal(source.match(/parseIdempotencyKey\(req\.get\("Idempotency-Key"\)\)/g)?.length, 2);
+  assert.equal(source.match(/pg_advisory_xact_lock\(hashtext\(\$\{lockKey\}\)\)/g)?.length, 3);
+  assert.equal(source.match(/await tx\.insert\(activityLogsTable\)/g)?.length, 2);
+  assert.match(source, /eq\(activityLogsTable\.action, "report_template_applied"\)/);
+  assert.match(source, /eq\(activityLogsTable\.action, "work_package_applied"\)/);
+  assert.equal(source.match(/Idempotent-Replay/g)?.length, 3);
+  assert.equal(source.match(/res\.status\(409\)/g)?.length, 2);
 });
 
 test("template application cannot bypass company-scoped reference checks", async () => {
