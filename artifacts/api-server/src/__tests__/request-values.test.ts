@@ -279,6 +279,8 @@ test("report routes reject partial IDs, invalid dates, and malformed filters", a
   assert.doesNotMatch(templateRoutes, /parseInt\(req\.params/);
   assert.match(reportRoutes, /const reportDate = parseDateOnly\(req\.body\?\.reportDate\)/);
   assert.match(reportRoutes, /const companyFilter = cqId === undefined \? null : parsePositiveId\(cqId\)/);
+  assert.match(reportRoutes, /const reportDateFilter = rdqId === undefined \? null : parseDateOnly\(rdqId\)/);
+  assert.match(reportRoutes, /reports = reports\.filter\(r => r\.reportDate === reportDateFilter\)/);
   assert.match(reportRoutes, /Math\.min\(limit, 100\)/);
   assert.match(templateRoutes, /const companyId = parsePositiveId\(req\.query\.companyId\)/);
 });

@@ -199,16 +199,25 @@ function formatSignature(s: typeof signaturesTable.$inferSelect) {
 // ── List reports ──────────────────────────────────────────────────────────────
 router.get("/reports", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const { companyId: cqId, crewId: crqId, projectId: prqId, status: sqId, limit: lqId } = req.query;
+  const {
+    companyId: cqId,
+    crewId: crqId,
+    projectId: prqId,
+    reportDate: rdqId,
+    status: sqId,
+    limit: lqId,
+  } = req.query;
 
   const companyFilter = cqId === undefined ? null : parsePositiveId(cqId);
   const crewFilter = crqId === undefined ? null : parsePositiveId(crqId);
   const projectFilter = prqId === undefined ? null : parsePositiveId(prqId);
+  const reportDateFilter = rdqId === undefined ? null : parseDateOnly(rdqId);
   const limit = lqId === undefined ? null : parsePositiveId(lqId);
   if (
     (cqId !== undefined && companyFilter === null)
     || (crqId !== undefined && crewFilter === null)
     || (prqId !== undefined && projectFilter === null)
+    || (rdqId !== undefined && reportDateFilter === null)
     || (lqId !== undefined && limit === null)
     || (sqId !== undefined && sqId !== "draft" && sqId !== "complete")
   ) {
@@ -231,6 +240,7 @@ router.get("/reports", requireAuth, async (req: AuthenticatedRequest, res): Prom
   if (companyFilter !== null) reports = reports.filter(r => r.companyId === companyFilter);
   if (crewFilter !== null) reports = reports.filter(r => r.crewId === crewFilter);
   if (projectFilter !== null) reports = reports.filter(r => r.projectId === projectFilter);
+  if (reportDateFilter !== null) reports = reports.filter(r => r.reportDate === reportDateFilter);
   if (sqId !== undefined) reports = reports.filter(r => r.status === sqId);
   if (limit !== null) reports = reports.slice(0, Math.min(limit, 100));
 
