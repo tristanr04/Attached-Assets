@@ -9,6 +9,7 @@ import {
 import { requireAuth, type AuthenticatedRequest } from "../middlewares/requireAuth";
 import { parsePositiveId } from "../lib/requestValues";
 import { canMutateReport } from "../lib/reportState";
+import { normalizeTemplateItems } from "../lib/templateItems";
 
 const router: IRouter = Router();
 
@@ -202,9 +203,14 @@ router.post("/report-templates/:id/apply", requireAuth, async (req: Authenticate
   if (!report.safetyNotes && template.defaultSafetyNotes) reportUpdates.safetyNotes = template.defaultSafetyNotes;
   if (!report.additionalNotes && template.defaultNotes) reportUpdates.additionalNotes = template.defaultNotes;
 
-  const laborItems = Array.isArray(template.laborItems) ? template.laborItems as Array<Record<string, unknown>> : [];
-  const equipmentItems = Array.isArray(template.equipmentItems) ? template.equipmentItems as Array<Record<string, unknown>> : [];
-  const materialItems = Array.isArray(template.materialItems) ? template.materialItems as Array<Record<string, unknown>> : [];
+  const normalizedItems = normalizeTemplateItems(
+    Array.isArray(template.laborItems) ? template.laborItems as Array<Record<string, unknown>> : [],
+    Array.isArray(template.equipmentItems) ? template.equipmentItems as Array<Record<string, unknown>> : [],
+    Array.isArray(template.materialItems) ? template.materialItems as Array<Record<string, unknown>> : [],
+    false,
+  );
+  if (!normalizedItems.valid) { res.status(400).json({ error: normalizedItems.error }); return; }
+  const { laborItems, equipmentItems, materialItems } = normalizedItems;
   const referenceError = await validateApplicationReferences(template.companyId, {
     defaultCrewId: reportUpdates.crewId,
     defaultProjectId: reportUpdates.projectId,
@@ -399,9 +405,14 @@ router.post("/work-package-templates/:id/apply", requireAuth, async (req: Authen
     return;
   }
 
-  const laborItems = Array.isArray(wp.laborItems) ? wp.laborItems as Array<Record<string, unknown>> : [];
-  const equipmentItems = Array.isArray(wp.equipmentItems) ? wp.equipmentItems as Array<Record<string, unknown>> : [];
-  const materialItems = Array.isArray(wp.materialItems) ? wp.materialItems as Array<Record<string, unknown>> : [];
+  const normalizedItems = normalizeTemplateItems(
+    Array.isArray(wp.laborItems) ? wp.laborItems as Array<Record<string, unknown>> : [],
+    Array.isArray(wp.equipmentItems) ? wp.equipmentItems as Array<Record<string, unknown>> : [],
+    Array.isArray(wp.materialItems) ? wp.materialItems as Array<Record<string, unknown>> : [],
+    true,
+  );
+  if (!normalizedItems.valid) { res.status(400).json({ error: normalizedItems.error }); return; }
+  const { laborItems, equipmentItems, materialItems } = normalizedItems;
   const referenceError = await validateApplicationReferences(wp.companyId, {
     laborItems,
     equipmentItems,

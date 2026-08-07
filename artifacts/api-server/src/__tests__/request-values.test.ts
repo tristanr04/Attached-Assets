@@ -13,6 +13,7 @@ import {
 } from "../lib/photoDataUrl";
 import { canMutateReport, completionUpdate } from "../lib/reportState";
 import { parseDecimalInput, parseLaborHours } from "../lib/numericInput";
+import { normalizeTemplateItems } from "../lib/templateItems";
 
 test("parsePositiveId accepts only canonical positive integer strings", () => {
   assert.equal(parsePositiveId("1"), 1);
@@ -318,4 +319,23 @@ test("template application cannot bypass company-scoped reference checks", async
     assert.match(source, new RegExp(`eq\\(${table}\\.companyId, companyId\\)`));
   }
   assert.equal(source.match(/validateApplicationReferences\(/g)?.length, 3);
+});
+
+test("template items reject invalid billable quantities before any writes", () => {
+  const valid = normalizeTemplateItems(
+    [{ name: "Lineman", hours: "12.5" }],
+    [{ name: "Bucket", hours: 8, quantity: 1 }],
+    [{ name: "Crossarm", quantity: "2.500" }],
+    true,
+  );
+  assert.equal(valid.valid, true);
+
+  for (const invalid of [
+    normalizeTemplateItems([{ hours: 25 }], [], [], true),
+    normalizeTemplateItems([], [{ hours: -1, quantity: 1 }], [], true),
+    normalizeTemplateItems([], [{ hours: 1, quantity: 0 }], [], true),
+    normalizeTemplateItems([], [], [{ quantity: "1.2345" }], true),
+  ]) {
+    assert.equal(invalid.valid, false);
+  }
 });
