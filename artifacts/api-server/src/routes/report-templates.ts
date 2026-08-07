@@ -124,8 +124,8 @@ function fmtTemplate(t: typeof reportTemplatesTable.$inferSelect) {
 // ── Report Templates ──────────────────────────────────────────────────────────
 router.get("/report-templates", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const companyId = parseInt(req.query.companyId as string, 10);
-  if (isNaN(companyId)) { res.status(400).json({ error: "companyId required" }); return; }
+  const companyId = parsePositiveId(req.query.companyId);
+  if (companyId === null) { res.status(400).json({ error: "companyId required" }); return; }
   const m = await checkAccess(req.clerkUserId, companyId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
   const templates = await db.select().from(reportTemplatesTable).where(eq(reportTemplatesTable.companyId, companyId));
@@ -153,7 +153,8 @@ router.post("/report-templates", requireAuth, async (req: AuthenticatedRequest, 
 
 router.patch("/report-templates/:id", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const id = parseInt(req.params.id, 10);
+  const id = parsePositiveId(req.params.id);
+  if (id === null) { res.status(400).json({ error: "Invalid id" }); return; }
   const [existing] = await db.select().from(reportTemplatesTable).where(eq(reportTemplatesTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
   const m = await checkAccess(req.clerkUserId, existing.companyId);
@@ -168,7 +169,8 @@ router.patch("/report-templates/:id", requireAuth, async (req: AuthenticatedRequ
 
 router.delete("/report-templates/:id", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const id = parseInt(req.params.id, 10);
+  const id = parsePositiveId(req.params.id);
+  if (id === null) { res.status(400).json({ error: "Invalid id" }); return; }
   const [existing] = await db.select().from(reportTemplatesTable).where(eq(reportTemplatesTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
   const m = await checkAccess(req.clerkUserId, existing.companyId);
@@ -344,8 +346,8 @@ function fmtWP(w: typeof workPackageTemplatesTable.$inferSelect) {
 
 router.get("/work-package-templates", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const companyId = parseInt(req.query.companyId as string, 10);
-  if (isNaN(companyId)) { res.status(400).json({ error: "companyId required" }); return; }
+  const companyId = parsePositiveId(req.query.companyId);
+  if (companyId === null) { res.status(400).json({ error: "companyId required" }); return; }
   const m = await checkAccess(req.clerkUserId, companyId);
   if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
   const templates = await db.select().from(workPackageTemplatesTable).where(eq(workPackageTemplatesTable.companyId, companyId));
@@ -371,7 +373,8 @@ router.post("/work-package-templates", requireAuth, async (req: AuthenticatedReq
 
 router.patch("/work-package-templates/:id", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const id = parseInt(req.params.id, 10);
+  const id = parsePositiveId(req.params.id);
+  if (id === null) { res.status(400).json({ error: "Invalid id" }); return; }
   const [existing] = await db.select().from(workPackageTemplatesTable).where(eq(workPackageTemplatesTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
   const m = await checkAccess(req.clerkUserId, existing.companyId);
@@ -386,7 +389,8 @@ router.patch("/work-package-templates/:id", requireAuth, async (req: Authenticat
 
 router.delete("/work-package-templates/:id", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const id = parseInt(req.params.id, 10);
+  const id = parsePositiveId(req.params.id);
+  if (id === null) { res.status(400).json({ error: "Invalid id" }); return; }
   const [existing] = await db.select().from(workPackageTemplatesTable).where(eq(workPackageTemplatesTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
   const m = await checkAccess(req.clerkUserId, existing.companyId);

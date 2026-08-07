@@ -259,6 +259,24 @@ test("report and template routes enforce foreman ownership", async () => {
   assert.match(templateRoutes, /checkAccess\(req\.clerkUserId, wp\.companyId, report\.foremanId\)/);
 });
 
+test("report routes reject partial IDs, invalid dates, and malformed filters", async () => {
+  const reportRoutes = await readFile(
+    new URL("../routes/reports.ts", import.meta.url),
+    "utf8",
+  );
+  const templateRoutes = await readFile(
+    new URL("../routes/report-templates.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.doesNotMatch(reportRoutes, /parseInt\(req\.params/);
+  assert.doesNotMatch(templateRoutes, /parseInt\(req\.params/);
+  assert.match(reportRoutes, /const reportDate = parseDateOnly\(req\.body\?\.reportDate\)/);
+  assert.match(reportRoutes, /const companyFilter = cqId === undefined \? null : parsePositiveId\(cqId\)/);
+  assert.match(reportRoutes, /Math\.min\(limit, 100\)/);
+  assert.match(templateRoutes, /const companyId = parsePositiveId\(req\.query\.companyId\)/);
+});
+
 test("report completion is idempotent and preserves the first completion time", () => {
   const now = new Date("2026-08-07T00:00:00.000Z");
   const original = new Date("2026-08-06T23:00:00.000Z");

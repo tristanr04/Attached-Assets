@@ -12,7 +12,7 @@ import {
   validatePhotoDataUrl,
   validateSignatureDataUrl,
 } from "../lib/photoDataUrl";
-import { parsePositiveId } from "../lib/requestValues";
+import { parseDateOnly, parsePositiveId } from "../lib/requestValues";
 import { canAccessReport, canMutateReport, completionUpdate } from "../lib/reportState";
 import { parseDecimalInput, parseLaborHours } from "../lib/numericInput";
 
@@ -196,6 +196,21 @@ router.get("/reports", requireAuth, async (req: AuthenticatedRequest, res): Prom
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
   const { companyId: cqId, crewId: crqId, projectId: prqId, status: sqId, limit: lqId } = req.query;
 
+  const companyFilter = cqId === undefined ? null : parsePositiveId(cqId);
+  const crewFilter = crqId === undefined ? null : parsePositiveId(crqId);
+  const projectFilter = prqId === undefined ? null : parsePositiveId(prqId);
+  const limit = lqId === undefined ? null : parsePositiveId(lqId);
+  if (
+    (cqId !== undefined && companyFilter === null)
+    || (crqId !== undefined && crewFilter === null)
+    || (prqId !== undefined && projectFilter === null)
+    || (lqId !== undefined && limit === null)
+    || (sqId !== undefined && sqId !== "draft" && sqId !== "complete")
+  ) {
+    res.status(400).json({ error: "Invalid report filters" });
+    return;
+  }
+
   const memberships = await db.select({ companyId: companyMembershipsTable.companyId, role: companyMembershipsTable.role, userId: companyMembershipsTable.userId })
     .from(companyMembershipsTable).where(eq(companyMembershipsTable.clerkUserId, req.clerkUserId));
 
@@ -208,11 +223,11 @@ router.get("/reports", requireAuth, async (req: AuthenticatedRequest, res): Prom
     return Boolean(membership && canAccessReport(membership.role, membership.userId, report.foremanId));
   });
 
-  if (cqId) reports = reports.filter(r => r.companyId === parseInt(cqId as string, 10));
-  if (crqId) reports = reports.filter(r => r.crewId === parseInt(crqId as string, 10));
-  if (prqId) reports = reports.filter(r => r.projectId === parseInt(prqId as string, 10));
-  if (sqId) reports = reports.filter(r => r.status === sqId);
-  if (lqId) reports = reports.slice(0, parseInt(lqId as string, 10));
+  if (companyFilter !== null) reports = reports.filter(r => r.companyId === companyFilter);
+  if (crewFilter !== null) reports = reports.filter(r => r.crewId === crewFilter);
+  if (projectFilter !== null) reports = reports.filter(r => r.projectId === projectFilter);
+  if (sqId !== undefined) reports = reports.filter(r => r.status === sqId);
+  if (limit !== null) reports = reports.slice(0, Math.min(limit, 100));
 
   const enriched = await Promise.all(reports.map(enrichReport));
   res.json(enriched);
@@ -222,7 +237,7 @@ router.get("/reports", requireAuth, async (req: AuthenticatedRequest, res): Prom
 router.post("/reports", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
   const companyId = parsePositiveId(req.body?.companyId);
-  const reportDate = typeof req.body?.reportDate === "string" ? req.body.reportDate : null;
+  const reportDate = parseDateOnly(req.body?.reportDate);
   if (companyId === null || !reportDate) { res.status(400).json({ error: "companyId and reportDate are required" }); return; }
 
   const m = await checkAccess(req.clerkUserId, companyId);
@@ -245,7 +260,8 @@ router.post("/reports", requireAuth, async (req: AuthenticatedRequest, res): Pro
 // ── Get report detail ─────────────────────────────────────────────────────────
 router.get("/reports/:reportId", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const reportId = parseInt(req.params.reportId, 10);
+  const reportId = parsePositiveId(req.params.reportId);
+  if (reportId === null) { res.status(400).json({ error: "Invalid reportId" }); return; }
 
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
@@ -275,7 +291,8 @@ router.get("/reports/:reportId", requireAuth, async (req: AuthenticatedRequest, 
 // ── Update report ─────────────────────────────────────────────────────────────
 router.patch("/reports/:reportId", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const reportId = parseInt(req.params.reportId, 10);
+  const reportId = parsePositiveId(req.params.reportId);
+  if (reportId === null) { res.status(400).json({ error: "Invalid reportId" }); return; }
 
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
@@ -295,7 +312,8 @@ router.patch("/reports/:reportId", requireAuth, async (req: AuthenticatedRequest
 // ── Delete report ─────────────────────────────────────────────────────────────
 router.delete("/reports/:reportId", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const reportId = parseInt(req.params.reportId, 10);
+  const reportId = parsePositiveId(req.params.reportId);
+  if (reportId === null) { res.status(400).json({ error: "Invalid reportId" }); return; }
 
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
@@ -311,7 +329,8 @@ router.delete("/reports/:reportId", requireAuth, async (req: AuthenticatedReques
 // ── Complete report ───────────────────────────────────────────────────────────
 router.post("/reports/:reportId/complete", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const reportId = parseInt(req.params.reportId, 10);
+  const reportId = parsePositiveId(req.params.reportId);
+  if (reportId === null) { res.status(400).json({ error: "Invalid reportId" }); return; }
 
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
@@ -344,7 +363,8 @@ router.post("/reports/:reportId/complete", requireAuth, async (req: Authenticate
 // ── Time entries ──────────────────────────────────────────────────────────────
 router.get("/reports/:reportId/time-entries", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const reportId = parseInt(req.params.reportId, 10);
+  const reportId = parsePositiveId(req.params.reportId);
+  if (reportId === null) { res.status(400).json({ error: "Invalid reportId" }); return; }
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
   const m = await checkAccess(req.clerkUserId, report.companyId, report.foremanId);
@@ -355,7 +375,8 @@ router.get("/reports/:reportId/time-entries", requireAuth, async (req: Authentic
 
 router.post("/reports/:reportId/time-entries", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const reportId = parseInt(req.params.reportId, 10);
+  const reportId = parsePositiveId(req.params.reportId);
+  if (reportId === null) { res.status(400).json({ error: "Invalid reportId" }); return; }
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
   const m = await checkAccess(req.clerkUserId, report.companyId, report.foremanId);
@@ -393,8 +414,10 @@ router.post("/reports/:reportId/time-entries", requireAuth, async (req: Authenti
 
 router.patch("/reports/:reportId/time-entries/:entryId", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const reportId = parseInt(req.params.reportId, 10);
-  const entryId = parseInt(req.params.entryId, 10);
+  const reportId = parsePositiveId(req.params.reportId);
+  if (reportId === null) { res.status(400).json({ error: "Invalid reportId" }); return; }
+  const entryId = parsePositiveId(req.params.entryId);
+  if (entryId === null) { res.status(400).json({ error: "Invalid entryId" }); return; }
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
   const m = await checkAccess(req.clerkUserId, report.companyId, report.foremanId);
@@ -429,8 +452,10 @@ router.patch("/reports/:reportId/time-entries/:entryId", requireAuth, async (req
 
 router.delete("/reports/:reportId/time-entries/:entryId", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const reportId = parseInt(req.params.reportId, 10);
-  const entryId = parseInt(req.params.entryId, 10);
+  const reportId = parsePositiveId(req.params.reportId);
+  if (reportId === null) { res.status(400).json({ error: "Invalid reportId" }); return; }
+  const entryId = parsePositiveId(req.params.entryId);
+  if (entryId === null) { res.status(400).json({ error: "Invalid entryId" }); return; }
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
   const m = await checkAccess(req.clerkUserId, report.companyId, report.foremanId);
@@ -443,7 +468,8 @@ router.delete("/reports/:reportId/time-entries/:entryId", requireAuth, async (re
 // ── Report Materials ──────────────────────────────────────────────────────────
 router.get("/reports/:reportId/materials", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const reportId = parseInt(req.params.reportId, 10);
+  const reportId = parsePositiveId(req.params.reportId);
+  if (reportId === null) { res.status(400).json({ error: "Invalid reportId" }); return; }
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
   const m = await checkAccess(req.clerkUserId, report.companyId, report.foremanId);
@@ -454,7 +480,8 @@ router.get("/reports/:reportId/materials", requireAuth, async (req: Authenticate
 
 router.post("/reports/:reportId/materials", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const reportId = parseInt(req.params.reportId, 10);
+  const reportId = parsePositiveId(req.params.reportId);
+  if (reportId === null) { res.status(400).json({ error: "Invalid reportId" }); return; }
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
   const m = await checkAccess(req.clerkUserId, report.companyId, report.foremanId);
@@ -487,8 +514,10 @@ router.post("/reports/:reportId/materials", requireAuth, async (req: Authenticat
 
 router.patch("/reports/:reportId/materials/:materialId", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const reportId = parseInt(req.params.reportId, 10);
-  const materialId = parseInt(req.params.materialId, 10);
+  const reportId = parsePositiveId(req.params.reportId);
+  if (reportId === null) { res.status(400).json({ error: "Invalid reportId" }); return; }
+  const materialId = parsePositiveId(req.params.materialId);
+  if (materialId === null) { res.status(400).json({ error: "Invalid materialId" }); return; }
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
   const m = await checkAccess(req.clerkUserId, report.companyId, report.foremanId);
@@ -520,8 +549,10 @@ router.patch("/reports/:reportId/materials/:materialId", requireAuth, async (req
 
 router.delete("/reports/:reportId/materials/:materialId", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const reportId = parseInt(req.params.reportId, 10);
-  const materialId = parseInt(req.params.materialId, 10);
+  const reportId = parsePositiveId(req.params.reportId);
+  if (reportId === null) { res.status(400).json({ error: "Invalid reportId" }); return; }
+  const materialId = parsePositiveId(req.params.materialId);
+  if (materialId === null) { res.status(400).json({ error: "Invalid materialId" }); return; }
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
   const m = await checkAccess(req.clerkUserId, report.companyId, report.foremanId);
@@ -534,7 +565,8 @@ router.delete("/reports/:reportId/materials/:materialId", requireAuth, async (re
 // ── Report Equipment ──────────────────────────────────────────────────────────
 router.get("/reports/:reportId/equipment", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const reportId = parseInt(req.params.reportId, 10);
+  const reportId = parsePositiveId(req.params.reportId);
+  if (reportId === null) { res.status(400).json({ error: "Invalid reportId" }); return; }
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
   const m = await checkAccess(req.clerkUserId, report.companyId, report.foremanId);
@@ -545,7 +577,8 @@ router.get("/reports/:reportId/equipment", requireAuth, async (req: Authenticate
 
 router.post("/reports/:reportId/equipment", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const reportId = parseInt(req.params.reportId, 10);
+  const reportId = parsePositiveId(req.params.reportId);
+  if (reportId === null) { res.status(400).json({ error: "Invalid reportId" }); return; }
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
   const m = await checkAccess(req.clerkUserId, report.companyId, report.foremanId);
@@ -580,8 +613,10 @@ router.post("/reports/:reportId/equipment", requireAuth, async (req: Authenticat
 
 router.patch("/reports/:reportId/equipment/:equipmentId", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const reportId = parseInt(req.params.reportId, 10);
-  const equipmentId = parseInt(req.params.equipmentId, 10);
+  const reportId = parsePositiveId(req.params.reportId);
+  if (reportId === null) { res.status(400).json({ error: "Invalid reportId" }); return; }
+  const equipmentId = parsePositiveId(req.params.equipmentId);
+  if (equipmentId === null) { res.status(400).json({ error: "Invalid equipmentId" }); return; }
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
   const m = await checkAccess(req.clerkUserId, report.companyId, report.foremanId);
@@ -612,8 +647,10 @@ router.patch("/reports/:reportId/equipment/:equipmentId", requireAuth, async (re
 
 router.delete("/reports/:reportId/equipment/:equipmentId", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const reportId = parseInt(req.params.reportId, 10);
-  const equipmentId = parseInt(req.params.equipmentId, 10);
+  const reportId = parsePositiveId(req.params.reportId);
+  if (reportId === null) { res.status(400).json({ error: "Invalid reportId" }); return; }
+  const equipmentId = parsePositiveId(req.params.equipmentId);
+  if (equipmentId === null) { res.status(400).json({ error: "Invalid equipmentId" }); return; }
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
   const m = await checkAccess(req.clerkUserId, report.companyId, report.foremanId);
@@ -626,7 +663,8 @@ router.delete("/reports/:reportId/equipment/:equipmentId", requireAuth, async (r
 // ── Photos ────────────────────────────────────────────────────────────────────
 router.get("/reports/:reportId/photos", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const reportId = parseInt(req.params.reportId, 10);
+  const reportId = parsePositiveId(req.params.reportId);
+  if (reportId === null) { res.status(400).json({ error: "Invalid reportId" }); return; }
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
   const m = await checkAccess(req.clerkUserId, report.companyId, report.foremanId);
@@ -637,7 +675,8 @@ router.get("/reports/:reportId/photos", requireAuth, async (req: AuthenticatedRe
 
 router.post("/reports/:reportId/photos", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const reportId = parseInt(req.params.reportId, 10);
+  const reportId = parsePositiveId(req.params.reportId);
+  if (reportId === null) { res.status(400).json({ error: "Invalid reportId" }); return; }
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
   const m = await checkAccess(req.clerkUserId, report.companyId, report.foremanId);
@@ -661,8 +700,10 @@ router.post("/reports/:reportId/photos", requireAuth, async (req: AuthenticatedR
 
 router.patch("/reports/:reportId/photos/:photoId", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const reportId = parseInt(req.params.reportId, 10);
-  const photoId = parseInt(req.params.photoId, 10);
+  const reportId = parsePositiveId(req.params.reportId);
+  if (reportId === null) { res.status(400).json({ error: "Invalid reportId" }); return; }
+  const photoId = parsePositiveId(req.params.photoId);
+  if (photoId === null) { res.status(400).json({ error: "Invalid photoId" }); return; }
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
   const m = await checkAccess(req.clerkUserId, report.companyId, report.foremanId);
@@ -680,8 +721,10 @@ router.patch("/reports/:reportId/photos/:photoId", requireAuth, async (req: Auth
 
 router.delete("/reports/:reportId/photos/:photoId", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const reportId = parseInt(req.params.reportId, 10);
-  const photoId = parseInt(req.params.photoId, 10);
+  const reportId = parsePositiveId(req.params.reportId);
+  if (reportId === null) { res.status(400).json({ error: "Invalid reportId" }); return; }
+  const photoId = parsePositiveId(req.params.photoId);
+  if (photoId === null) { res.status(400).json({ error: "Invalid photoId" }); return; }
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
   const m = await checkAccess(req.clerkUserId, report.companyId, report.foremanId);
@@ -695,7 +738,8 @@ router.delete("/reports/:reportId/photos/:photoId", requireAuth, async (req: Aut
 // ── Signature ─────────────────────────────────────────────────────────────────
 router.post("/reports/:reportId/signature", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const reportId = parseInt(req.params.reportId, 10);
+  const reportId = parsePositiveId(req.params.reportId);
+  if (reportId === null) { res.status(400).json({ error: "Invalid reportId" }); return; }
   const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
   if (!report) { res.status(404).json({ error: "Not found" }); return; }
   const m = await checkAccess(req.clerkUserId, report.companyId, report.foremanId);
