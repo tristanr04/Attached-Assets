@@ -14,6 +14,7 @@ import {
 } from "../lib/photoDataUrl";
 import { parsePositiveId } from "../lib/requestValues";
 import { canMutateReport, completionUpdate } from "../lib/reportState";
+import { parseDecimalInput, parseLaborHours } from "../lib/numericInput";
 
 const router: IRouter = Router();
 
@@ -354,6 +355,15 @@ router.post("/reports/:reportId/time-entries", requireAuth, async (req: Authenti
 
   const { employeeName, trade, regularHours, overtimeHours, doubleTimeHours, crewMemberId } = req.body;
   if (!employeeName || !trade) { res.status(400).json({ error: "employeeName and trade are required" }); return; }
+  const hours = parseLaborHours({
+    regularHours: regularHours ?? 0,
+    overtimeHours: overtimeHours ?? 0,
+    doubleTimeHours: doubleTimeHours ?? 0,
+  });
+  if (!hours) {
+    res.status(400).json({ error: "Labor hours must be non-negative, use at most 2 decimals, and total no more than 24" });
+    return;
+  }
   const normalizedCrewMemberId = await normalizeLineItemReference(
     report.companyId,
     crewMemberId,
@@ -366,9 +376,7 @@ router.post("/reports/:reportId/time-entries", requireAuth, async (req: Authenti
 
   const [entry] = await db.insert(timeEntriesTable).values({
     reportId, employeeName, trade,
-    regularHours: String(regularHours ?? 0),
-    overtimeHours: String(overtimeHours ?? 0),
-    doubleTimeHours: String(doubleTimeHours ?? 0),
+    ...hours,
     crewMemberId: normalizedCrewMemberId,
   }).returning();
   res.status(201).json(formatTimeEntry(entry));
@@ -385,12 +393,24 @@ router.patch("/reports/:reportId/time-entries/:entryId", requireAuth, async (req
   if (rejectLockedReport(report, m.role, res)) { return; }
 
   const { employeeName, trade, regularHours, overtimeHours, doubleTimeHours } = req.body;
+  const [existingEntry] = await db.select().from(timeEntriesTable)
+    .where(and(eq(timeEntriesTable.id, entryId), eq(timeEntriesTable.reportId, reportId)));
+  if (!existingEntry) { res.status(404).json({ error: "Not found" }); return; }
+  const hours = parseLaborHours({
+    regularHours: regularHours ?? existingEntry.regularHours,
+    overtimeHours: overtimeHours ?? existingEntry.overtimeHours,
+    doubleTimeHours: doubleTimeHours ?? existingEntry.doubleTimeHours,
+  });
+  if (!hours) {
+    res.status(400).json({ error: "Labor hours must be non-negative, use at most 2 decimals, and total no more than 24" });
+    return;
+  }
   const updates: Record<string, unknown> = {};
   if (employeeName !== undefined) updates.employeeName = employeeName;
   if (trade !== undefined) updates.trade = trade;
-  if (regularHours !== undefined) updates.regularHours = String(regularHours);
-  if (overtimeHours !== undefined) updates.overtimeHours = String(overtimeHours);
-  if (doubleTimeHours !== undefined) updates.doubleTimeHours = String(doubleTimeHours);
+  if (regularHours !== undefined) updates.regularHours = hours.regularHours;
+  if (overtimeHours !== undefined) updates.overtimeHours = hours.overtimeHours;
+  if (doubleTimeHours !== undefined) updates.doubleTimeHours = hours.doubleTimeHours;
 
   const [updated] = await db.update(timeEntriesTable).set(updates)
     .where(and(eq(timeEntriesTable.id, entryId), eq(timeEntriesTable.reportId, reportId))).returning();
@@ -433,6 +453,16 @@ router.post("/reports/:reportId/materials", requireAuth, async (req: Authenticat
   if (rejectLockedReport(report, m.role, res)) { return; }
   const { name, quantity, unit, notes, catalogMaterialId } = req.body;
   if (!name || quantity == null || !unit) { res.status(400).json({ error: "name, quantity, unit required" }); return; }
+  const normalizedQuantity = parseDecimalInput(quantity, {
+    min: 0,
+    max: 9_999_999.999,
+    scale: 3,
+    allowZero: false,
+  });
+  if (normalizedQuantity === null) {
+    res.status(400).json({ error: "quantity must be positive and use at most 3 decimals" });
+    return;
+  }
   const normalizedCatalogMaterialId = await normalizeLineItemReference(
     report.companyId,
     catalogMaterialId,
@@ -442,7 +472,7 @@ router.post("/reports/:reportId/materials", requireAuth, async (req: Authenticat
     res.status(400).json({ error: "catalogMaterialId must belong to the report company" });
     return;
   }
-  const [mat] = await db.insert(reportMaterialsTable).values({ reportId, name, quantity: String(quantity), unit, notes: notes ?? null, catalogMaterialId: normalizedCatalogMaterialId }).returning();
+  const [mat] = await db.insert(reportMaterialsTable).values({ reportId, name, quantity: normalizedQuantity, unit, notes: notes ?? null, catalogMaterialId: normalizedCatalogMaterialId }).returning();
   res.status(201).json(formatMaterial(mat));
 });
 
@@ -458,7 +488,19 @@ router.patch("/reports/:reportId/materials/:materialId", requireAuth, async (req
   const { name, quantity, unit, notes } = req.body;
   const updates: Record<string, unknown> = {};
   if (name !== undefined) updates.name = name;
-  if (quantity !== undefined) updates.quantity = String(quantity);
+  if (quantity !== undefined) {
+    const normalizedQuantity = parseDecimalInput(quantity, {
+      min: 0,
+      max: 9_999_999.999,
+      scale: 3,
+      allowZero: false,
+    });
+    if (normalizedQuantity === null) {
+      res.status(400).json({ error: "quantity must be positive and use at most 3 decimals" });
+      return;
+    }
+    updates.quantity = normalizedQuantity;
+  }
   if (unit !== undefined) updates.unit = unit;
   if (notes !== undefined) updates.notes = notes;
   const [updated] = await db.update(reportMaterialsTable).set(updates)
@@ -502,6 +544,15 @@ router.post("/reports/:reportId/equipment", requireAuth, async (req: Authenticat
   if (rejectLockedReport(report, m.role, res)) { return; }
   const { name, hoursUsed, notes, unitId, catalogEquipmentId } = req.body;
   if (!name) { res.status(400).json({ error: "name is required" }); return; }
+  const normalizedHoursUsed = parseDecimalInput(hoursUsed ?? 0, {
+    min: 0,
+    max: 24,
+    scale: 2,
+  });
+  if (normalizedHoursUsed === null) {
+    res.status(400).json({ error: "hoursUsed must be between 0 and 24 with at most 2 decimals" });
+    return;
+  }
   const normalizedCatalogEquipmentId = await normalizeLineItemReference(
     report.companyId,
     catalogEquipmentId,
@@ -512,7 +563,7 @@ router.post("/reports/:reportId/equipment", requireAuth, async (req: Authenticat
     return;
   }
   const [equip] = await db.insert(reportEquipmentTable).values({
-    reportId, name, hoursUsed: String(hoursUsed ?? 0), notes: notes ?? null,
+    reportId, name, hoursUsed: normalizedHoursUsed, notes: notes ?? null,
     unitId: unitId ?? null, catalogEquipmentId: normalizedCatalogEquipmentId,
   }).returning();
   res.status(201).json(formatEquipment(equip));
@@ -530,7 +581,18 @@ router.patch("/reports/:reportId/equipment/:equipmentId", requireAuth, async (re
   const { name, hoursUsed, notes, unitId } = req.body;
   const updates: Record<string, unknown> = {};
   if (name !== undefined) updates.name = name;
-  if (hoursUsed !== undefined) updates.hoursUsed = String(hoursUsed);
+  if (hoursUsed !== undefined) {
+    const normalizedHoursUsed = parseDecimalInput(hoursUsed, {
+      min: 0,
+      max: 24,
+      scale: 2,
+    });
+    if (normalizedHoursUsed === null) {
+      res.status(400).json({ error: "hoursUsed must be between 0 and 24 with at most 2 decimals" });
+      return;
+    }
+    updates.hoursUsed = normalizedHoursUsed;
+  }
   if (notes !== undefined) updates.notes = notes;
   if (unitId !== undefined) updates.unitId = unitId;
   const [updated] = await db.update(reportEquipmentTable).set(updates)

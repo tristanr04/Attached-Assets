@@ -12,6 +12,7 @@ import {
   validateSignatureDataUrl,
 } from "../lib/photoDataUrl";
 import { canMutateReport, completionUpdate } from "../lib/reportState";
+import { parseDecimalInput, parseLaborHours } from "../lib/numericInput";
 
 test("parsePositiveId accepts only canonical positive integer strings", () => {
   assert.equal(parsePositiveId("1"), 1);
@@ -257,4 +258,32 @@ test("report line-item references are scoped to the report company", async () =>
   assert.match(source, /crewMemberId: normalizedCrewMemberId/);
   assert.match(source, /catalogMaterialId: normalizedCatalogMaterialId/);
   assert.match(source, /catalogEquipmentId: normalizedCatalogEquipmentId/);
+});
+
+test("decimal input rejects malformed, negative, excessive, and over-precision values", () => {
+  const options = { min: 0, max: 24, scale: 2 };
+  assert.equal(parseDecimalInput("12.25", options), "12.25");
+  assert.equal(parseDecimalInput(0, options), "0");
+
+  for (const value of ["-1", " 1", "1 ", "1.234", "1e2", 25, NaN, Infinity, null]) {
+    assert.equal(parseDecimalInput(value, options), null);
+  }
+});
+
+test("labor hour buckets cannot exceed one day in total", () => {
+  assert.deepEqual(parseLaborHours({
+    regularHours: 8,
+    overtimeHours: 4,
+    doubleTimeHours: 2,
+  }), {
+    regularHours: "8",
+    overtimeHours: "4",
+    doubleTimeHours: "2",
+  });
+
+  assert.equal(parseLaborHours({
+    regularHours: 16,
+    overtimeHours: 8,
+    doubleTimeHours: 1,
+  }), null);
 });
