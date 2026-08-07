@@ -13,6 +13,7 @@ import billableItemsRouter from "./billable-items";
 import reportTemplatesRouter from "./report-templates";
 import pkbRouter from "./pkb";
 import poleCaptureRouter from "./pole-capture";
+import poleAssetsRouter from "./pole-assets";
 
 const router: IRouter = Router();
 
@@ -30,5 +31,6 @@ router.use(billableItemsRouter);
 router.use(reportTemplatesRouter);
 router.use(pkbRouter);
 router.use(poleCaptureRouter);
+router.use(poleAssetsRouter);
 
 export default router;

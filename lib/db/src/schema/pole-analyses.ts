@@ -6,6 +6,7 @@ import { usersTable } from "./users";
 import { projectsTable } from "./projects";
 import { dailyReportsTable } from "./daily-reports";
 import { pkbWorkPackagesTable } from "./pkb-work-packages";
+import { poleAssetsTable } from "./pole-assets";
 
 /**
  * pole_analyses — immutable capture record created when a foreman submits a pole photo.
@@ -59,6 +60,13 @@ export const poleAnalysesTable = pgTable("pole_analyses", {
   // ── Downstream report ──────────────────────────────────────────────────────
   linkedReportId: integer("linked_report_id")
     .references(() => dailyReportsTable.id, { onDelete: "set null" }),
+
+  // ── Pole Identity Engine results ───────────────────────────────────────────
+  // Which registered pole asset this photo matches (set after identity engine runs)
+  poleAssetId: integer("pole_asset_id")
+    .references(() => poleAssetsTable.id, { onDelete: "set null" }),
+  // Full identity engine output: { status, candidates, requestedCapture, … }
+  identityResult: jsonb("identity_result"),
 
   // ── Duplicate detection ────────────────────────────────────────────────────
   duplicateOfId: integer("duplicate_of_id"),      // FK to pole_analyses.id

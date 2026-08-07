@@ -10,10 +10,12 @@
  * All routes enforce company isolation. Nothing is billed/submitted before confirmation.
  */
 import { Router, type IRouter } from "express";
-import { eq, and, desc, gte, ilike, or } from "drizzle-orm";
+import { eq, and, desc, gte, ilike, or, sql } from "drizzle-orm";
 import {
   db,
   poleAnalysesTable,
+  poleAssetsTable,
+  poleReferencePhotosTable,
   companyMembershipsTable,
   usersTable,
   projectsTable,
@@ -32,6 +34,11 @@ import {
   buildConfirmedFields,
   type ScoredProject,
 } from "../lib/pole-capture-logic";
+import {
+  identifyPole,
+  buildVisualDescription,
+  type PoleAssetForMatching,
+} from "../lib/pole-identity-engine";
 
 const router: IRouter = Router();
 
@@ -79,6 +86,8 @@ function formatAnalysis(a: typeof poleAnalysesTable.$inferSelect) {
     confirmedFields: a.confirmedFields,
     linkedReportId: a.linkedReportId,
     duplicateOfId: a.duplicateOfId,
+    poleAssetId: a.poleAssetId,
+    identityResult: a.identityResult,
     errorMessage: a.errorMessage,
     auditLog: a.auditLog,
     createdAt: a.createdAt.toISOString(),
@@ -308,6 +317,71 @@ async function runAnalysis(analysisId: number, companyId: number, photoData: str
       hazardsObserved:  { value: ai.hazardsObserved?.value ?? [], confidence: ai.hazardsObserved?.confidence ?? 0, source: "ai_vision" },
     };
 
+    // ── Pole Identity Engine ────────────────────────────────────────────────
+    // Build a visual keyword description from AI output for fingerprinting
+    const visualDesc = buildVisualDescription(proposedFields) || null;
+
+    // Fetch GPS from the stored analysis record
+    const [storedAnalysis] = await db
+      .select({ gpsLat: poleAnalysesTable.gpsLat, gpsLng: poleAnalysesTable.gpsLng, gpsAccuracyM: poleAnalysesTable.gpsAccuracyM })
+      .from(poleAnalysesTable)
+      .where(eq(poleAnalysesTable.id, analysisId));
+
+    // Fetch company pole assets (company-scoped: only this company's poles)
+    const poleAssets = await db
+      .select({
+        id: poleAssetsTable.id,
+        poleNumber: poleAssetsTable.poleNumber,
+        utilityTag: poleAssetsTable.utilityTag,
+        lat: poleAssetsTable.lat,
+        lng: poleAssetsTable.lng,
+        referencePhotoCount: poleAssetsTable.referencePhotoCount,
+      })
+      .from(poleAssetsTable)
+      .where(eq(poleAssetsTable.companyId, companyId));
+
+    // Fetch reference photo descriptions for all assets in one query
+    const refPhotos = poleAssets.length > 0
+      ? await db
+          .select({
+            poleAssetId: poleReferencePhotosTable.poleAssetId,
+            visualDescription: poleReferencePhotosTable.visualDescription,
+          })
+          .from(poleReferencePhotosTable)
+          .where(
+            and(
+              eq(poleReferencePhotosTable.companyId, companyId),
+              eq(poleReferencePhotosTable.isActive, true),
+            ),
+          )
+      : [];
+
+    const identityCandidates: PoleAssetForMatching[] = poleAssets.map(a => ({
+      id: a.id,
+      poleNumber: a.poleNumber,
+      utilityTag: a.utilityTag,
+      lat: a.lat != null ? Number(a.lat) : null,
+      lng: a.lng != null ? Number(a.lng) : null,
+      referenceDescriptions: refPhotos
+        .filter(r => r.poleAssetId === a.id && r.visualDescription)
+        .map(r => r.visualDescription!),
+      referencePhotoCount: a.referencePhotoCount,
+    }));
+
+    const identityResult = identifyPole({
+      ocrPoleTag: poleTag,
+      ocrConfidence: ocrConf ?? 0,
+      gpsLat: storedAnalysis?.gpsLat != null ? Number(storedAnalysis.gpsLat) : null,
+      gpsLng: storedAnalysis?.gpsLng != null ? Number(storedAnalysis.gpsLng) : null,
+      gpsAccuracyM: storedAnalysis?.gpsAccuracyM != null ? Number(storedAnalysis.gpsAccuracyM) : null,
+      visualDescription: visualDesc,
+      candidates: identityCandidates,
+    });
+
+    const identifiedPoleAssetId = identityResult.status === "identified"
+      ? identityResult.poleAssetId
+      : null;
+
     // ── Duplicate check ─────────────────────────────────────────────────────
     const dupId = await checkDuplicate(companyId, poleTag, analysisId);
 
@@ -325,8 +399,13 @@ async function runAnalysis(analysisId: number, companyId: number, photoData: str
         matchMethod,
         matchCandidates: candidates,
         proposedFields,
+        identityResult,
+        poleAssetId: identifiedPoleAssetId,
         duplicateOfId: dupId,
-        auditLog: appendAuditLog(null, { action: "analyzed", detail: `OCR: ${poleTag ?? "none"}, match: ${matchMethod} (${Math.round(matchConf * 100)}%)` }),
+        auditLog: appendAuditLog(null, {
+          action: "analyzed",
+          detail: `OCR: ${poleTag ?? "none"}, identity: ${identityResult.status}${identifiedPoleAssetId ? ` (asset #${identifiedPoleAssetId})` : ""}, match: ${matchMethod} (${Math.round(matchConf * 100)}%)`,
+        }),
       })
       .where(eq(poleAnalysesTable.id, analysisId))
       .returning();
@@ -629,6 +708,12 @@ router.post("/pole-capture/:id/confirm", requireAuth, async (req: AuthenticatedR
     category: "full_pole",
   });
 
+  // ── Resolve pole asset ID (explicit body > identity engine result) ──────────
+  const resolvedPoleAssetId: number | null =
+    req.body.poleAssetId != null
+      ? Number(req.body.poleAssetId)
+      : (analysis.poleAssetId ?? null);
+
   // ── Mark analysis as confirmed ─────────────────────────────────────────────
   await db
     .update(poleAnalysesTable)
@@ -638,15 +723,56 @@ router.post("/pole-capture/:id/confirm", requireAuth, async (req: AuthenticatedR
       confirmedByUserId: dbUser?.id ?? null,
       confirmedAt: new Date(),
       linkedReportId: reportId,
+      poleAssetId: resolvedPoleAssetId,
       auditLog: appendAuditLog(analysis.auditLog as any[], {
         action: "confirmed",
         by: dbUser?.id,
-        detail: `Report ${reportId} (${reportCreated ? "created" : "updated"}) for project ${projectId}`,
+        detail: `Report ${reportId} (${reportCreated ? "created" : "updated"}) for project ${projectId}${resolvedPoleAssetId ? `, pole asset #${resolvedPoleAssetId}` : ""}`,
       }),
     })
     .where(eq(poleAnalysesTable.id, id));
 
-  res.json({ reportId, created: reportCreated });
+  // ── Add verified reference photo to pole asset ─────────────────────────────
+  // This improves future identifications for the same pole.
+  if (resolvedPoleAssetId) {
+    // Build the visual description from confirmed fields (or proposed fallback)
+    const finalFields = (confirmedFields ?? analysis.proposedFields) as Record<string, any> | null;
+    const visualDesc = finalFields
+      ? buildVisualDescription(
+          Object.fromEntries(
+            Object.entries(finalFields).map(([k, v]) => [k, { value: v?.value ?? null }]),
+          ),
+        ) || null
+      : null;
+
+    try {
+      await db.insert(poleReferencePhotosTable).values({
+        poleAssetId: resolvedPoleAssetId,
+        companyId: analysis.companyId,
+        photoData: analysis.photoData,
+        photoMimeType: analysis.photoMimeType,
+        capturedAt: analysis.createdAt,
+        gpsLat: analysis.gpsLat,
+        gpsLng: analysis.gpsLng,
+        visualDescription: visualDesc,
+        poleAnalysisId: analysis.id,
+        isActive: true,
+      });
+
+      // Increment reference photo count and mark as verified
+      await db
+        .update(poleAssetsTable)
+        .set({
+          referencePhotoCount: sql`${poleAssetsTable.referencePhotoCount} + 1`,
+          isVerified: true,
+        })
+        .where(eq(poleAssetsTable.id, resolvedPoleAssetId));
+    } catch {
+      // Don't fail confirmation if reference photo insertion fails
+    }
+  }
+
+  res.json({ reportId, created: reportCreated, poleAssetId: resolvedPoleAssetId });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

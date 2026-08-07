@@ -9,7 +9,7 @@ import { useLocation } from "wouter";
 import {
   CheckCircle2, XCircle, Pencil, AlertTriangle, Loader2, ChevronDown, ChevronUp,
   MapPin, Cpu, RefreshCw, Camera, Tag, Wrench, Box, FileCheck, Layers, ShieldCheck,
-  Building2, Zap, CircleDot,
+  Building2, Zap, CircleDot, Fingerprint, Search, ScanLine, ImagePlus, HelpCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -53,6 +53,35 @@ interface JobCandidate {
   method: string;
 }
 
+// ── Pole Identity Engine types ────────────────────────────────────────────────
+interface SignalBreakdown {
+  ocr: number;
+  gpsM: number | null;
+  gps: number;
+  visual: number;
+  refBoost: number;
+  total: number;
+}
+
+interface IdentityCandidate {
+  poleAssetId: number;
+  poleNumber: string | null;
+  utilityTag: string | null;
+  confidence: number;
+  signals: SignalBreakdown;
+  evidence: string[];
+}
+
+type IdentityStatus = "identified" | "uncertain" | "needs_photo" | "no_assets";
+type RequestedCapture = "pole_tag_closeup" | "full_pole_view" | "second_angle" | null;
+
+interface IdentityResult {
+  status: IdentityStatus;
+  poleAssetId: number | null;
+  candidates: IdentityCandidate[];
+  requestedCapture: RequestedCapture;
+}
+
 interface Analysis {
   id: number;
   status: string;
@@ -69,6 +98,8 @@ interface Analysis {
   errorMessage: string | null;
   linkedReportId: number | null;
   duplicateOfId: number | null;
+  poleAssetId: number | null;
+  identityResult: IdentityResult | null;
 }
 
 // ── Confidence helpers ────────────────────────────────────────────────────────
@@ -227,6 +258,211 @@ function FieldCard({
   );
 }
 
+// ── Pole Identity Panel ───────────────────────────────────────────────────────
+const CAPTURE_LABELS: Record<string, { icon: React.ReactNode; title: string; description: string }> = {
+  pole_tag_closeup: {
+    icon: <ScanLine className="h-6 w-6 text-amber-500" />,
+    title: "Take a Pole-Tag Close-Up",
+    description: "Move closer to the pole and photograph the tag or number plate directly. A clear, well-lit close-up lets the engine read the ID precisely.",
+  },
+  full_pole_view: {
+    icon: <ImagePlus className="h-6 w-6 text-amber-500" />,
+    title: "Take a Full-Pole Photo",
+    description: "Step back so the entire pole is visible from base to top. This helps the engine match framing, equipment and surrounding landmarks.",
+  },
+  second_angle: {
+    icon: <Search className="h-6 w-6 text-amber-500" />,
+    title: "Capture a Second Angle",
+    description: "Photograph the pole from a different direction or distance. Multiple angles give the engine stronger visual evidence.",
+  },
+};
+
+interface PoleIdentityPanelProps {
+  result: IdentityResult | null;
+  selectedPoleAssetId: number | null;
+  onSelectAsset: (id: number, poleNumber: string | null) => void;
+  onTakeNewPhoto: () => void;
+}
+
+function PoleIdentityPanel({ result, selectedPoleAssetId, onSelectAsset, onTakeNewPhoto }: PoleIdentityPanelProps) {
+  const [expanded, setExpanded] = useState(false);
+
+  if (!result) return null;
+
+  if (result.status === "no_assets") {
+    return (
+      <div className="flex items-start gap-3 bg-muted/40 border border-border rounded-xl px-4 py-3">
+        <Fingerprint className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+        <div className="text-xs text-muted-foreground">
+          <span className="font-semibold text-foreground">No poles registered yet.</span>{" "}
+          Confirming this analysis will start building your company's pole registry. Future captures will match against it automatically.
+        </div>
+      </div>
+    );
+  }
+
+  if (result.status === "needs_photo" && result.candidates.length === 0) {
+    const capture = result.requestedCapture ? CAPTURE_LABELS[result.requestedCapture] : null;
+    return (
+      <div className="border border-amber-500/40 bg-amber-500/5 rounded-xl p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <HelpCircle className="h-4 w-4 text-amber-500" />
+          <span className="font-bold text-sm text-amber-600">Can't Identify Pole</span>
+        </div>
+        {capture ? (
+          <div className="flex items-start gap-3">
+            {capture.icon}
+            <div>
+              <div className="font-semibold text-sm">{capture.title}</div>
+              <div className="text-xs text-muted-foreground mt-0.5">{capture.description}</div>
+            </div>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">Not enough signal to identify the pole. You can still confirm with a manual selection.</p>
+        )}
+        <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5 border-amber-500/40" onClick={onTakeNewPhoto}>
+          <Camera className="h-3.5 w-3.5" />
+          {capture?.title ?? "Take Another Photo"}
+        </Button>
+      </div>
+    );
+  }
+
+  if (result.status === "identified" && result.candidates[0]) {
+    const top = result.candidates[0];
+    const label = top.poleNumber ?? top.utilityTag ?? `Asset #${top.poleAssetId}`;
+    return (
+      <div className="border border-green-500/40 bg-green-500/5 rounded-xl p-4 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Fingerprint className="h-4 w-4 text-green-500" />
+            <span className="font-bold text-sm text-green-600">Pole Identified</span>
+            <Badge className="bg-green-500/15 text-green-700 border-green-400/40 border text-[10px] font-bold px-1.5 py-0">
+              {Math.round(top.confidence * 100)}% Confidence
+            </Badge>
+          </div>
+          <button className="text-xs text-muted-foreground flex items-center gap-1 hover:text-foreground" onClick={() => setExpanded(v => !v)}>
+            {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+            Evidence
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2 font-mono font-black text-lg">{label}</div>
+
+        <div className="flex flex-wrap gap-1.5">
+          {top.signals.ocr >= 0.28 && (
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/15 text-green-700 border border-green-400/30 font-semibold">
+              OCR ✓
+            </span>
+          )}
+          {top.signals.gps >= 0.20 && (
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/15 text-green-700 border border-green-400/30 font-semibold">
+              GPS ✓ {top.signals.gpsM != null ? `(${Math.round(top.signals.gpsM)}m)` : ""}
+            </span>
+          )}
+          {top.signals.visual >= 0.12 && (
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/15 text-green-700 border border-green-400/30 font-semibold">
+              Visual ✓
+            </span>
+          )}
+          {top.signals.refBoost > 0 && (
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/15 text-green-700 border border-green-400/30 font-semibold">
+              {Math.round(top.signals.refBoost / 0.01)} verified photo{top.signals.refBoost > 0.01 ? "s" : ""}
+            </span>
+          )}
+        </div>
+
+        {expanded && (
+          <div className="space-y-1 border-t border-green-500/20 pt-2">
+            {top.evidence.map((ev, i) => (
+              <div key={i} className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <CheckCircle2 className="h-3 w-3 text-green-500 shrink-0" />
+                {ev}
+              </div>
+            ))}
+          </div>
+        )}
+
+        <p className="text-[11px] text-muted-foreground">
+          Photo will be added as a verified reference after confirmation, improving future identifications.
+        </p>
+      </div>
+    );
+  }
+
+  // uncertain or needs_photo with candidates
+  const capture = result.requestedCapture ? CAPTURE_LABELS[result.requestedCapture] : null;
+  return (
+    <div className="border border-border rounded-xl p-4 space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Fingerprint className="h-4 w-4 text-yellow-500" />
+          <span className="font-bold text-sm">Uncertain — Choose the Correct Pole</span>
+        </div>
+        <span className="text-[10px] text-muted-foreground">{result.candidates.length} candidate{result.candidates.length > 1 ? "s" : ""}</span>
+      </div>
+
+      <p className="text-xs text-muted-foreground">
+        Multiple poles match these signals. Select the correct pole below, or take a better photo.
+      </p>
+
+      <div className="space-y-2">
+        {result.candidates.map(c => {
+          const label = c.poleNumber ?? c.utilityTag ?? `Asset #${c.poleAssetId}`;
+          const isSelected = selectedPoleAssetId === c.poleAssetId;
+          return (
+            <div
+              key={c.poleAssetId}
+              className={cn(
+                "border rounded-xl p-3 cursor-pointer transition-all space-y-2",
+                isSelected ? "border-primary/50 bg-primary/5" : "border-border hover:border-primary/30",
+              )}
+              onClick={() => onSelectAsset(c.poleAssetId, c.poleNumber)}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  {isSelected
+                    ? <CheckCircle2 className="h-4 w-4 text-primary" />
+                    : <CircleDot className="h-4 w-4 text-muted-foreground" />}
+                  <span className="font-mono font-bold text-sm">{label}</span>
+                </div>
+                <span className={cn(
+                  "text-[10px] font-bold px-1.5 py-0.5 rounded border",
+                  c.confidence >= 0.65 ? "bg-yellow-500/15 text-yellow-600 border-yellow-400/40"
+                    : "bg-muted/40 text-muted-foreground border-border",
+                )}>
+                  {Math.round(c.confidence * 100)}%
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {c.evidence.map((ev, i) => (
+                  <span key={i} className="text-[10px] text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded">
+                    {ev}
+                  </span>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {capture && (
+        <div className="border-t border-border pt-3 flex items-start gap-3">
+          {capture.icon}
+          <div className="flex-1 min-w-0">
+            <div className="text-xs font-semibold">{capture.title}</div>
+            <div className="text-[11px] text-muted-foreground mt-0.5">{capture.description}</div>
+          </div>
+          <Button size="sm" variant="outline" className="h-8 text-xs shrink-0 gap-1.5" onClick={onTakeNewPhoto}>
+            <Camera className="h-3.5 w-3.5" />
+            Retry
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Job match card ────────────────────────────────────────────────────────────
 interface JobMatchCardProps {
   candidates: JobCandidate[] | null;
@@ -344,6 +580,8 @@ export default function PoleAnalysisReviewPage({ id }: Props) {
   const [editValues, setEditValues] = useState<Record<string, string>>({});
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [selectedProjectName, setSelectedProjectName] = useState<string | null>(null);
+  // Pole identity: auto-set when engine status === "identified"; foreman can override in "uncertain"
+  const [selectedPoleAssetId, setSelectedPoleAssetId] = useState<number | null>(null);
 
   // Load analysis
   const loadAnalysis = useCallback(async () => {
@@ -355,11 +593,18 @@ export default function PoleAnalysisReviewPage({ id }: Props) {
       const data: Analysis = await res.json();
       setAnalysis(data);
 
-      // Pre-select top candidate
+      // Pre-select top project candidate
       if (data.matchedProjectId) {
         const top = data.matchCandidates?.[0];
         setSelectedProjectId(data.matchedProjectId);
         setSelectedProjectName(top?.projectName ?? null);
+      }
+
+      // Pre-select pole asset when engine auto-identified it
+      if (data.identityResult?.status === "identified" && data.identityResult.poleAssetId) {
+        setSelectedPoleAssetId(data.identityResult.poleAssetId);
+      } else if (data.poleAssetId) {
+        setSelectedPoleAssetId(data.poleAssetId);
       }
     } catch (err: any) {
       setError(err.message);
@@ -420,6 +665,7 @@ export default function PoleAnalysisReviewPage({ id }: Props) {
         projectId: selectedProjectId,
         fieldStatuses,
         editValues,
+        ...(selectedPoleAssetId != null ? { poleAssetId: selectedPoleAssetId } : {}),
       };
       const res = await fetch(`${BASE()}/api/pole-capture/${id}/confirm`, {
         method: "POST",
@@ -489,7 +735,7 @@ export default function PoleAnalysisReviewPage({ id }: Props) {
         </div>
         <div className="space-y-2">
           <h2 className="text-2xl font-bold">Analyzing Pole…</h2>
-          <p className="text-muted-foreground">Reading pole tag, identifying equipment, matching to active job</p>
+          <p className="text-muted-foreground">Reading pole tag · Identifying equipment · Matching to registered poles · Linking to active job</p>
         </div>
         <Loader2 className="h-5 w-5 animate-spin text-muted-foreground mx-auto" />
       </div>
@@ -627,6 +873,14 @@ export default function PoleAnalysisReviewPage({ id }: Props) {
               Nothing is saved until you press <strong className="text-foreground">Confirm Pole Analysis</strong>.
             </p>
           </div>
+
+          {/* Pole Identity Engine panel */}
+          <PoleIdentityPanel
+            result={analysis.identityResult}
+            selectedPoleAssetId={selectedPoleAssetId}
+            onSelectAsset={(assetId) => setSelectedPoleAssetId(assetId)}
+            onTakeNewPhoto={() => navigate("/pole-capture")}
+          />
 
           {/* Job match */}
           <JobMatchCard
