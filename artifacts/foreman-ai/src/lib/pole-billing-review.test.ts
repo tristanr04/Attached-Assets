@@ -22,6 +22,8 @@ test("billing review UI is mobile-safe and has no billing application control", 
   assert.match(source, /break-words/);
   assert.match(source, /selectedRate !== null \|\| suggestion\.estimatedAmount !== null/);
   assert.match(source, /Rate and charge selection stay with an authorized reviewer/);
+  assert.match(source, /Advisory billing warnings/);
+  assert.match(source, /Reviewer attention needed/);
   assert.doesNotMatch(source, /Apply Suggestion|Approve Charge|Create Invoice|Submit Billing/);
   for (const width of [320, 375, 390, 430]) assert.ok(width < 640, `${width}px must retain the single-column review layout`);
 });

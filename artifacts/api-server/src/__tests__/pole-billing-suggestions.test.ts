@@ -27,6 +27,7 @@ test("creates review-only suggestions from exact foreman-confirmed item IDs", ()
   });
   assert.equal(result.suggestions.length, 1);
   assert.deepEqual(result.conflicts, []);
+  assert.deepEqual(result.warnings.map(warning => warning.code), ["rate_context_required"]);
   assert.equal(result.suggestions[0]?.state, "review_required");
   assert.equal(result.suggestions[0]?.canApply, false);
   assert.equal(result.suggestions[0]?.selectedRate, null);
@@ -34,6 +35,46 @@ test("creates review-only suggestions from exact foreman-confirmed item IDs", ()
   assert.deepEqual(result.suggestions[0]?.rateOptions, {
     base: "125.0000", overtime: "150.0000", doubleTime: null, emergency: null, storm: "175.0000",
   });
+});
+
+test("warns when confirmed work has no exact billable-item reference", () => {
+  const result = buildPoleBillingSuggestions({
+    companyId: 1, reportDate: "2026-08-07", customer: "Utility A",
+    facts: [fact(9, ["replace-transformer"], 10, "visibleWorkActions")], items: [],
+  });
+  assert.equal(result.suggestions.length, 0);
+  assert.equal(result.warnings[0]?.code, "possible_missing_charge");
+  assert.deepEqual(result.warnings[0]?.factIds, [9]);
+});
+
+test("warns when confirmed analysis records missing documentation", () => {
+  const result = buildPoleBillingSuggestions({
+    companyId: 1, reportDate: "2026-08-07", customer: "Utility A",
+    facts: [fact(10, ["transformer nameplate close-up"], 10, "missingEvidence")], items: [],
+  });
+  assert.equal(result.warnings[0]?.code, "missing_documentation");
+  assert.deepEqual(result.warnings[0]?.factIds, [10]);
+});
+
+test("warns when a confirmed item has no rate without inventing an amount", () => {
+  const result = buildPoleBillingSuggestions({
+    companyId: 1, reportDate: "2026-08-07", customer: "Utility A",
+    facts: [fact(11, { billableItemId: 7, quantity: 1 })],
+    items: [item({ baseRate: null, overtimeRate: null, stormRate: null })],
+  });
+  assert.equal(result.warnings[0]?.code, "missing_rate");
+  assert.equal(result.suggestions[0]?.selectedRate, null);
+  assert.equal(result.suggestions[0]?.estimatedAmount, null);
+});
+
+test("does not create a rate warning when exactly one review option exists", () => {
+  const result = buildPoleBillingSuggestions({
+    companyId: 1, reportDate: "2026-08-07", customer: "Utility A",
+    facts: [fact(12, { billableItemId: 7, quantity: 1 })],
+    items: [item({ overtimeRate: null, stormRate: null })],
+  });
+  assert.deepEqual(result.warnings, []);
+  assert.equal(result.canApply, false);
 });
 
 test("ignores non-quantity facts and rejects hidden or unsafe quantity data", () => {

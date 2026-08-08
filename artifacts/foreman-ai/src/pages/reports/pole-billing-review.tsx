@@ -30,11 +30,14 @@ interface PoleBillingConflict {
   message: string;
 }
 
+interface PoleBillingWarning extends PoleBillingConflict {}
+
 interface PoleBillingReviewResponse {
   reviewRequired: true;
   canApply: false;
   suggestions: PoleBillingSuggestion[];
   conflicts: PoleBillingConflict[];
+  warnings: PoleBillingWarning[];
 }
 
 function displayRate(value: string) {
@@ -60,6 +63,7 @@ export default function PoleBillingReview({ reportId }: { reportId: number }) {
 
   const suggestions = data?.suggestions ?? [];
   const conflicts = data?.conflicts ?? [];
+  const warnings = data?.warnings ?? [];
   return (
     <Card className="overflow-hidden border-primary/40">
       <CardHeader className="space-y-2 bg-primary/[0.04] p-4 sm:p-5">
@@ -86,7 +90,21 @@ export default function PoleBillingReview({ reportId }: { reportId: number }) {
           </div>
         )}
 
-        {suggestions.length === 0 && conflicts.length === 0 && (
+        {warnings.length > 0 && (
+          <div className="space-y-2" aria-label="Advisory billing warnings">
+            {warnings.map((warning, index) => (
+              <div key={`${warning.code}-${warning.billableItemId ?? "unknown"}-${index}`} className="flex min-w-0 gap-2 rounded-lg border border-orange-500/40 bg-orange-500/10 p-3">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-orange-700 dark:text-orange-400" />
+                <div className="min-w-0">
+                  <p className="break-words text-sm font-bold">Reviewer attention needed</p>
+                  <p className="mt-1 break-words text-xs text-muted-foreground">{warning.message}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {suggestions.length === 0 && conflicts.length === 0 && warnings.length === 0 && (
           <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">No reviewable pole billing suggestions are available. Enter and verify charges manually.</p>
         )}
 

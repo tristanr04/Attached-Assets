@@ -31,6 +31,48 @@ export interface BillingSuggestionConflict {
   message: string;
 }
 
+export interface BillingSuggestionWarning {
+  code:
+    | "possible_missing_charge"
+    | "missing_rate"
+    | "rate_context_required"
+    | "missing_documentation";
+  billableItemId: number | null;
+  factIds: number[];
+  message: string;
+}
+
+export interface PoleBillingSuggestion {
+  state: "review_required";
+  canApply: false;
+  billableItem: {
+    id: number;
+    category: string;
+    name: string;
+    billingCode: string | null;
+    customer: string | null;
+    unitType: string | null;
+  };
+  quantity: number;
+  rateOptions: {
+    base: string | null;
+    overtime: string | null;
+    doubleTime: string | null;
+    emergency: string | null;
+    storm: string | null;
+  };
+  selectedRate: null;
+  estimatedAmount: null;
+  source: {
+    factId: number;
+    photoId: number;
+    analysisRunId: number;
+    analysisVersion: number;
+    confirmedByUserId: number;
+    confirmedAt: Date;
+  };
+}
+
 interface ConfirmedQuantity {
   billableItemId: number;
   quantity: number;
@@ -86,6 +128,28 @@ function normalizedCustomer(value: string | null): string | null {
   return normalized || null;
 }
 
+function hasMeaningfulValue(value: unknown): boolean {
+  if (value === null || value === undefined || value === false) return false;
+  if (typeof value === "string") return value.trim().length > 0;
+  if (typeof value === "number") return Number.isFinite(value) && value !== 0;
+  if (Array.isArray(value)) return value.some(hasMeaningfulValue);
+  if (typeof value === "object") return Object.values(value).some(hasMeaningfulValue);
+  return true;
+}
+
+const WORK_REFERENCE_FIELDS = new Set([
+  "visibleWorkActions",
+  "matchedWorkActionIds",
+  "matchedWorkPackageIds",
+  "matchedCatalogItemIds",
+]);
+
+const MISSING_DOCUMENTATION_FIELDS = new Set([
+  "missingEvidence",
+  "missingRequiredEvidence",
+  "missingDocumentation",
+]);
+
 export function buildPoleBillingSuggestions(input: {
   companyId: number;
   reportDate: string;
@@ -95,6 +159,7 @@ export function buildPoleBillingSuggestions(input: {
 }) {
   const extracted = extractConfirmedBillingReferences(input.facts);
   const conflicts = [...extracted.conflicts];
+  const warnings: BillingSuggestionWarning[] = [];
   const items = new Map(input.items.filter(item => item.companyId === input.companyId).map(item => [item.id, item]));
   const referencesByItem = new Map<number, ConfirmedQuantity[]>();
   for (const reference of extracted.references) {
@@ -103,7 +168,7 @@ export function buildPoleBillingSuggestions(input: {
     referencesByItem.set(reference.billableItemId, group);
   }
 
-  const suggestions: Array<Record<string, unknown>> = [];
+  const suggestions: PoleBillingSuggestion[] = [];
   for (const [billableItemId, references] of referencesByItem) {
     if (references.length > 1) {
       conflicts.push({
@@ -151,7 +216,7 @@ export function buildPoleBillingSuggestions(input: {
       continue;
     }
 
-    suggestions.push({
+    const suggestion: PoleBillingSuggestion = {
       state: "review_required",
       canApply: false,
       billableItem: {
@@ -180,6 +245,46 @@ export function buildPoleBillingSuggestions(input: {
         confirmedByUserId: reference.fact.confirmedByUserId,
         confirmedAt: reference.fact.confirmedAt,
       },
+    };
+    suggestions.push(suggestion);
+
+    const availableRateCount = Object.values(suggestion.rateOptions).filter(rate => rate !== null).length;
+    if (availableRateCount === 0) {
+      warnings.push({
+        code: "missing_rate",
+        billableItemId,
+        factIds: [reference.fact.id],
+        message: "This confirmed item has no effective rate option; an authorized reviewer must resolve the company rate before billing.",
+      });
+    } else if (availableRateCount > 1) {
+      warnings.push({
+        code: "rate_context_required",
+        billableItemId,
+        factIds: [reference.fact.id],
+        message: "Multiple rate types are available. An authorized reviewer must verify base, overtime, double-time, emergency, or storm context.",
+      });
+    }
+  }
+
+  const unmappedWorkFacts = input.facts.filter(fact =>
+    WORK_REFERENCE_FIELDS.has(fact.fieldKey) && hasMeaningfulValue(fact.value));
+  if (unmappedWorkFacts.length > 0 && extracted.references.length === 0) {
+    warnings.push({
+      code: "possible_missing_charge",
+      billableItemId: null,
+      factIds: unmappedWorkFacts.map(fact => fact.id),
+      message: "Confirmed work or catalog matches have no exact billable-item quantity reference. Reconcile them manually to avoid a missed charge.",
+    });
+  }
+
+  const missingDocumentationFacts = input.facts.filter(fact =>
+    MISSING_DOCUMENTATION_FIELDS.has(fact.fieldKey) && hasMeaningfulValue(fact.value));
+  if (missingDocumentationFacts.length > 0) {
+    warnings.push({
+      code: "missing_documentation",
+      billableItemId: null,
+      factIds: missingDocumentationFacts.map(fact => fact.id),
+      message: "Required evidence is still missing. Resolve the documented gaps before approving related charges.",
     });
   }
 
@@ -188,5 +293,6 @@ export function buildPoleBillingSuggestions(input: {
     canApply: false,
     suggestions,
     conflicts,
+    warnings,
   };
 }
