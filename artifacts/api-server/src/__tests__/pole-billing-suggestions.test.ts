@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildPoleBillingSuggestions, type BillingSuggestionItem } from "../lib/poleBillingSuggestions";
+import {
+  billingRateVersionToken,
+  buildPoleBillingSuggestions,
+  parsePoleBillingReviewRequest,
+  validatePoleBillingReviewSelection,
+  type BillingSuggestionItem,
+} from "../lib/poleBillingSuggestions";
 import type { ConfirmedPoleFact } from "../lib/poleFactHistory";
 
 function fact(id: number, value: unknown, photoId = 10, fieldKey = "quantities"): ConfirmedPoleFact {
@@ -32,9 +38,75 @@ test("creates review-only suggestions from exact foreman-confirmed item IDs", ()
   assert.equal(result.suggestions[0]?.canApply, false);
   assert.equal(result.suggestions[0]?.selectedRate, null);
   assert.equal(result.suggestions[0]?.estimatedAmount, null);
+  assert.match(result.suggestions[0]?.rateVersionToken ?? "", /^[a-f0-9]{64}$/);
   assert.deepEqual(result.suggestions[0]?.rateOptions, {
     base: "125.0000", overtime: "150.0000", doubleTime: null, emergency: null, storm: "175.0000",
   });
+});
+
+test("parses an exact human rate review without accepting hidden billing fields", () => {
+  const token = billingRateVersionToken(item());
+  assert.deepEqual(parsePoleBillingReviewRequest({
+    factId: 1, billableItemId: 7, quantity: 2.5, rateType: "storm", rateVersionToken: token,
+  }, "billing-review:fixture-1"), {
+    factId: 1, billableItemId: 7, quantity: 2.5, rateType: "storm", rateVersionToken: token,
+    idempotencyKey: "billing-review:fixture-1",
+  });
+  assert.throws(() => parsePoleBillingReviewRequest({
+    factId: 1, billableItemId: 7, quantity: 2.5, rateType: "storm", rateVersionToken: token,
+    estimatedAmount: 999,
+  }, "billing-review:fixture-1"), /Unsupported billing review field/);
+});
+
+test("validates a human-selected rate snapshot but keeps application disabled", () => {
+  const result = buildPoleBillingSuggestions({
+    companyId: 1, reportDate: "2026-08-07", customer: "Utility A",
+    facts: [fact(1, { billableItemId: 7, quantity: 2.5 })], items: [item()],
+  });
+  const suggestion = result.suggestions[0]!;
+  const review = validatePoleBillingReviewSelection(suggestion, parsePoleBillingReviewRequest({
+    factId: 1, billableItemId: 7, quantity: 2.5, rateType: "storm",
+    rateVersionToken: suggestion.rateVersionToken,
+  }, "billing-review:fixture-2"));
+  assert.equal(review.selectedRateSnapshot, "175.0000");
+  assert.equal(review.canApply, false);
+  assert.equal(review.estimatedAmount, null);
+});
+
+test("rejects stale source, quantity, rate version, and unavailable rate choices", () => {
+  const result = buildPoleBillingSuggestions({
+    companyId: 1, reportDate: "2026-08-07", customer: "Utility A",
+    facts: [fact(1, { billableItemId: 7, quantity: 2.5 })], items: [item()],
+  });
+  const suggestion = result.suggestions[0]!;
+  const base = parsePoleBillingReviewRequest({
+    factId: 1, billableItemId: 7, quantity: 2.5, rateType: "storm",
+    rateVersionToken: suggestion.rateVersionToken,
+  }, "billing-review:fixture-3");
+  for (const changed of [
+    { factId: 2 },
+    { billableItemId: 8 },
+    { quantity: 3 },
+    { rateVersionToken: "0".repeat(64) },
+    { rateType: "doubleTime" as const },
+  ]) assert.throws(() => validatePoleBillingReviewSelection(suggestion, { ...base, ...changed }));
+});
+
+test("rate version token changes with company billing context and rate edits", () => {
+  const original = billingRateVersionToken(item());
+  for (const changed of [
+    { companyId: 2 }, { billingCode: "3PT-NEW" }, { customer: "Utility B" }, { effectiveDate: "2026-02-01" },
+    { expirationDate: "2026-12-31" }, { stormRate: "180.0000" },
+    { updatedAt: "2026-08-08T12:00:00.000Z" },
+  ]) assert.notEqual(billingRateVersionToken(item(changed)), original);
+});
+
+test("review requests require supported rate types, bounded values, and durable retry keys", () => {
+  const token = billingRateVersionToken(item());
+  const base = { factId: 1, billableItemId: 7, quantity: 1, rateType: "base", rateVersionToken: token };
+  assert.throws(() => parsePoleBillingReviewRequest({ ...base, rateType: "holiday" }, "billing-review:fixture-4"), /rate type/);
+  assert.throws(() => parsePoleBillingReviewRequest({ ...base, quantity: 1.0009 }, "billing-review:fixture-4"), /identifiers or quantity/);
+  assert.throws(() => parsePoleBillingReviewRequest(base, "short"), /Idempotency-Key/);
 });
 
 test("warns when confirmed work has no exact billable-item reference", () => {

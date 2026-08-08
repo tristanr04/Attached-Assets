@@ -1,3 +1,6 @@
+import { createHash } from "node:crypto";
+
+import { parseIdempotencyKey } from "./idempotency";
 import type { ConfirmedPoleFact } from "./poleFactHistory";
 
 export interface BillingSuggestionItem {
@@ -16,6 +19,7 @@ export interface BillingSuggestionItem {
   active: boolean;
   effectiveDate: string | null;
   expirationDate: string | null;
+  updatedAt?: Date | string;
 }
 
 export interface BillingSuggestionConflict {
@@ -54,6 +58,7 @@ export interface PoleBillingSuggestion {
     unitType: string | null;
   };
   quantity: number;
+  rateVersionToken: string;
   rateOptions: {
     base: string | null;
     overtime: string | null;
@@ -73,6 +78,17 @@ export interface PoleBillingSuggestion {
   };
 }
 
+export type PoleBillingRateType = "base" | "overtime" | "doubleTime" | "emergency" | "storm";
+
+export interface PoleBillingReviewRequest {
+  factId: number;
+  billableItemId: number;
+  quantity: number;
+  rateType: PoleBillingRateType;
+  rateVersionToken: string;
+  idempotencyKey: string;
+}
+
 interface ConfirmedQuantity {
   billableItemId: number;
   quantity: number;
@@ -80,6 +96,8 @@ interface ConfirmedQuantity {
 }
 
 const MAX_QUANTITY = 1_000_000;
+const RATE_VERSION_TOKEN = /^[a-f0-9]{64}$/;
+const RATE_TYPES = new Set<PoleBillingRateType>(["base", "overtime", "doubleTime", "emergency", "storm"]);
 
 function hasAtMostThreeDecimals(value: number): boolean {
   return Math.abs(Math.round(value * 1_000) - value * 1_000) < 1e-8;
@@ -94,6 +112,71 @@ function parseQuantityRecord(value: unknown): { billableItemId: number; quantity
   if (typeof record.quantity !== "number" || !Number.isFinite(record.quantity)) return null;
   if (record.quantity <= 0 || record.quantity > MAX_QUANTITY || !hasAtMostThreeDecimals(record.quantity)) return null;
   return { billableItemId: Number(record.billableItemId), quantity: record.quantity };
+}
+
+export function billingRateVersionToken(item: BillingSuggestionItem): string {
+  const updatedAt = item.updatedAt instanceof Date ? item.updatedAt.toISOString() : item.updatedAt ?? "";
+  return createHash("sha256").update(JSON.stringify([
+    item.companyId, item.id, item.category, item.name, item.billingCode, item.customer, item.unitType, item.active,
+    item.effectiveDate, item.expirationDate, updatedAt,
+    item.baseRate, item.overtimeRate, item.doubleTimeRate, item.emergencyRate, item.stormRate,
+  ])).digest("hex");
+}
+
+export function parsePoleBillingReviewRequest(body: unknown, idempotencyHeader: unknown): PoleBillingReviewRequest {
+  if (!body || typeof body !== "object" || Array.isArray(body)) throw new Error("A billing review request is required");
+  const record = body as Record<string, unknown>;
+  const allowed = new Set(["factId", "billableItemId", "quantity", "rateType", "rateVersionToken"]);
+  if (Object.keys(record).some(key => !allowed.has(key))) throw new Error("Unsupported billing review field");
+  const parsedQuantity = parseQuantityRecord({ billableItemId: record.billableItemId, quantity: record.quantity });
+  if (!parsedQuantity || !Number.isSafeInteger(record.factId) || Number(record.factId) <= 0) {
+    throw new Error("Invalid billing review identifiers or quantity");
+  }
+  if (typeof record.rateType !== "string" || !RATE_TYPES.has(record.rateType as PoleBillingRateType)) {
+    throw new Error("Invalid billing rate type");
+  }
+  if (typeof record.rateVersionToken !== "string" || !RATE_VERSION_TOKEN.test(record.rateVersionToken)) {
+    throw new Error("Invalid or missing billing rate version");
+  }
+  const idempotencyKey = parseIdempotencyKey(idempotencyHeader);
+  if (!idempotencyKey) throw new Error("A valid Idempotency-Key is required");
+  return {
+    factId: Number(record.factId),
+    billableItemId: parsedQuantity.billableItemId,
+    quantity: parsedQuantity.quantity,
+    rateType: record.rateType as PoleBillingRateType,
+    rateVersionToken: record.rateVersionToken,
+    idempotencyKey,
+  };
+}
+
+export function validatePoleBillingReviewSelection(
+  suggestion: PoleBillingSuggestion,
+  request: PoleBillingReviewRequest,
+) {
+  if (suggestion.state !== "review_required" || suggestion.canApply !== false
+    || suggestion.selectedRate !== null || suggestion.estimatedAmount !== null) {
+    throw new Error("Unsafe billing suggestion state");
+  }
+  if (suggestion.source.factId !== request.factId || suggestion.billableItem.id !== request.billableItemId) {
+    throw new Error("Billing review no longer matches its confirmed source");
+  }
+  if (suggestion.quantity !== request.quantity) throw new Error("Confirmed billing quantity changed");
+  if (suggestion.rateVersionToken !== request.rateVersionToken) throw new Error("Billing rate version changed");
+  const selectedRateSnapshot = suggestion.rateOptions[request.rateType];
+  if (selectedRateSnapshot === null) throw new Error("Selected billing rate type is unavailable");
+  return {
+    reviewValidated: true as const,
+    canApply: false as const,
+    factId: request.factId,
+    billableItemId: request.billableItemId,
+    quantity: request.quantity,
+    selectedRateType: request.rateType,
+    selectedRateSnapshot,
+    rateVersionToken: request.rateVersionToken,
+    idempotencyKey: request.idempotencyKey,
+    estimatedAmount: null,
+  };
 }
 
 export function extractConfirmedBillingReferences(facts: ConfirmedPoleFact[]): {
@@ -228,6 +311,7 @@ export function buildPoleBillingSuggestions(input: {
         unitType: item.unitType,
       },
       quantity: reference.quantity,
+      rateVersionToken: billingRateVersionToken(item),
       rateOptions: {
         base: item.baseRate,
         overtime: item.overtimeRate,
