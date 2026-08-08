@@ -23,6 +23,11 @@ import { normalizeTemplateItems } from "../lib/templateItems";
 import { applicationLockKey, parseIdempotencyKey, photoUploadLockKey } from "../lib/idempotency";
 import { canManageCrew } from "../lib/crewAccess";
 import {
+  canManageTemplateConfiguration,
+  normalizeConfiguredTemplateItems,
+  normalizeTemplateChecklist,
+} from "../lib/templateConfiguration";
+import {
   normalizeBillableNumbers,
   parseBillableCategory,
   parseOptionalDate,
@@ -569,7 +574,46 @@ test("template application cannot bypass company-scoped reference checks", async
   ]) {
     assert.match(source, new RegExp(`eq\\(${table}\\.companyId, companyId\\)`));
   }
-  assert.equal(source.match(/validateApplicationReferences\(/g)?.length, 3);
+  assert.equal(source.match(/validateApplicationReferences\(/g)?.length, 7);
+});
+
+test("only managers can configure report templates and work packages", async () => {
+  assert.equal(canManageTemplateConfiguration("admin"), true);
+  assert.equal(canManageTemplateConfiguration("supervisor"), true);
+  assert.equal(canManageTemplateConfiguration("foreman"), false);
+
+  const source = await readFile(new URL("../routes/report-templates.ts", import.meta.url), "utf8");
+  assert.equal(source.match(/!canManageTemplateConfiguration\(m\.role\)/g)?.length, 6);
+  assert.equal(source.match(/const companyId = parsePositiveId\(req\.body\?\.companyId\)/g)?.length, 2);
+});
+
+test("stored template items are bounded, normalized, and reject hidden fields", () => {
+  const valid = normalizeConfiguredTemplateItems(
+    [{ name: " Lineman ", trade: "Line", laborClassificationId: "12", hours: "8.25" }],
+    [{ name: "Bucket", catalogEquipmentId: 3, hours: "4.5", quantity: 1 }],
+    [{ name: "Crossarm", catalogMaterialId: 9, quantity: "2.500", unit: "each" }],
+    true,
+  );
+  assert.equal(valid.valid, true);
+  if (valid.valid) {
+    assert.equal(valid.laborItems[0]?.name, "Lineman");
+    assert.equal(valid.laborItems[0]?.laborClassificationId, 12);
+    assert.equal(valid.laborItems[0]?.hours, "8.25");
+  }
+
+  assert.equal(normalizeConfiguredTemplateItems([{ name: "Lineman", rate: 999 }], [], [], true).valid, false);
+  assert.equal(normalizeConfiguredTemplateItems([{ name: "x".repeat(501) }], [], [], true).valid, false);
+  assert.equal(normalizeConfiguredTemplateItems(new Array(101).fill({ name: "Lineman" }), [], [], true).valid, false);
+  assert.equal(normalizeConfiguredTemplateItems([], [{ name: "Bucket", quantity: 0 }], [], true).valid, false);
+});
+
+test("work-package checklist values are bounded and normalized", () => {
+  assert.deepEqual(normalizeTemplateChecklist(["  Tailboard  ", "Pole photo"], "safetyChecklist"), {
+    valid: true,
+    items: ["Tailboard", "Pole photo"],
+  });
+  assert.equal(normalizeTemplateChecklist([""], "safetyChecklist").valid, false);
+  assert.equal(normalizeTemplateChecklist(new Array(101).fill("item"), "requiredDocumentation").valid, false);
 });
 
 test("template items reject invalid billable quantities before any writes", () => {
