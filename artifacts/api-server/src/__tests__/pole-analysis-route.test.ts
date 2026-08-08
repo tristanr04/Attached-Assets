@@ -79,3 +79,17 @@ test("confirmed fact reads remain report/company scoped and omit billing data", 
   assert.match(route, /Cache-Control", "private, no-store/);
   assert.match(route, /desc\(reportPoleFactsTable\.id\)/);
 });
+
+test("billing suggestions are authorized, company scoped, current-fact-only, and review-only", () => {
+  assert.match(route, /\/reports\/:reportId\/pole-billing-suggestions/);
+  assert.match(route, /canAccessReport\(membership\.role, membership\.userId, report\.foremanId\)/);
+  assert.match(route, /eq\(reportPoleFactsTable\.companyId, report\.companyId\)/);
+  assert.match(route, /eq\(reportPoleFactsTable\.reportId, reportId\)/);
+  assert.match(route, /partitionPoleFactHistory\(facts\)\.currentFacts/);
+  assert.match(route, /eq\(billableItemsTable\.companyId, report\.companyId\)/);
+  assert.match(route, /inArray\(billableItemsTable\.id, ids\)/);
+  assert.match(route, /eq\(projectsTable\.companyId, report\.companyId\)/);
+  assert.match(route, /buildPoleBillingSuggestions/);
+  assert.match(route, /Cache-Control", "private, no-store/);
+  assert.doesNotMatch(route, /insert\(reportMaterialsTable\)|insert\(reportEquipmentTable\)|insert\(timeEntriesTable\)/);
+});

@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import {
+  billableItemsTable,
   companyMembershipsTable,
   dailyReportsTable,
   db,
@@ -10,6 +11,7 @@ import {
   poleAnalysisFieldsTable,
   poleAnalysisJobsTable,
   poleAnalysisRunsTable,
+  projectsTable,
   reportPoleFactsTable,
 } from "@workspace/db";
 
@@ -23,6 +25,7 @@ import { parsePositiveId } from "../lib/requestValues";
 import { parseIdempotencyKey } from "../lib/idempotency";
 import { canAccessReport } from "../lib/reportState";
 import { partitionPoleFactHistory } from "../lib/poleFactHistory";
+import { buildPoleBillingSuggestions, extractConfirmedBillingReferences } from "../lib/poleBillingSuggestions";
 
 const router: IRouter = Router();
 
@@ -276,6 +279,69 @@ router.get(
     );
     res.set("Cache-Control", "private, no-store");
     res.json(partitionPoleFactHistory(facts));
+  },
+);
+
+router.get(
+  "/reports/:reportId/pole-billing-suggestions",
+  requireAuth,
+  async (req: AuthenticatedRequest, res): Promise<void> => {
+    if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
+    const reportId = parsePositiveId(req.params.reportId);
+    if (reportId === null) { res.status(400).json({ error: "Invalid report identifier" }); return; }
+
+    const [report] = await db.select().from(dailyReportsTable).where(eq(dailyReportsTable.id, reportId));
+    if (!report) { res.status(404).json({ error: "Not found" }); return; }
+    const [membership] = await db.select().from(companyMembershipsTable).where(and(
+      eq(companyMembershipsTable.companyId, report.companyId),
+      eq(companyMembershipsTable.clerkUserId, req.clerkUserId),
+    ));
+    if (!membership || !canAccessReport(membership.role, membership.userId, report.foremanId)) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
+
+    const facts = await db.select({
+      id: reportPoleFactsTable.id,
+      photoId: reportPoleFactsTable.photoId,
+      analysisRunId: reportPoleFactsTable.analysisRunId,
+      analysisVersion: reportPoleFactsTable.analysisVersion,
+      fieldKey: reportPoleFactsTable.fieldKey,
+      value: reportPoleFactsTable.value,
+      decisionAction: reportPoleFactsTable.decisionAction,
+      confirmedByUserId: reportPoleFactsTable.confirmedByUserId,
+      confirmedAt: reportPoleFactsTable.confirmedAt,
+    }).from(reportPoleFactsTable).where(and(
+      eq(reportPoleFactsTable.companyId, report.companyId),
+      eq(reportPoleFactsTable.reportId, reportId),
+    )).orderBy(
+      desc(reportPoleFactsTable.confirmedAt),
+      desc(reportPoleFactsTable.analysisRunId),
+      desc(reportPoleFactsTable.id),
+    );
+    const currentFacts = partitionPoleFactHistory(facts).currentFacts;
+    const ids = [...new Set(extractConfirmedBillingReferences(currentFacts).references.map(reference => reference.billableItemId))];
+    const items = ids.length === 0 ? [] : await db.select().from(billableItemsTable).where(and(
+      eq(billableItemsTable.companyId, report.companyId),
+      inArray(billableItemsTable.id, ids),
+    ));
+    const [project] = report.projectId === null ? [] : await db.select({ customer: projectsTable.customer })
+      .from(projectsTable)
+      .where(and(eq(projectsTable.id, report.projectId), eq(projectsTable.companyId, report.companyId)));
+
+    res.set("Cache-Control", "private, no-store");
+    res.json({
+      reportId,
+      reportDate: report.reportDate,
+      customer: project?.customer ?? null,
+      ...buildPoleBillingSuggestions({
+        companyId: report.companyId,
+        reportDate: report.reportDate,
+        customer: project?.customer ?? null,
+        facts: currentFacts,
+        items,
+      }),
+    });
   },
 );
 
