@@ -11,6 +11,12 @@ import { parseDateOnly, parsePositiveId } from "../lib/requestValues";
 import { canAccessReport, canMutateReport, dailyReportLockKey } from "../lib/reportState";
 import { normalizeTemplateItems } from "../lib/templateItems";
 import { applicationLockKey, parseIdempotencyKey } from "../lib/idempotency";
+import { parseOptionalText, parseRequiredText } from "../lib/billableItemInput";
+import {
+  canManageTemplateConfiguration,
+  normalizeConfiguredTemplateItems,
+  normalizeTemplateChecklist,
+} from "../lib/templateConfiguration";
 
 const router: IRouter = Router();
 
@@ -122,6 +128,57 @@ function fmtTemplate(t: typeof reportTemplatesTable.$inferSelect) {
   };
 }
 
+const REPORT_TEMPLATE_FIELDS = new Set([
+  "companyId", "name", "description", "defaultCrewId", "defaultProjectId", "defaultCustomer",
+  "defaultWorkLocation", "defaultWorkPerformed", "defaultSafetyNotes", "defaultNotes", "laborItems",
+  "equipmentItems", "materialItems", "active",
+]);
+
+function parseReportTemplateConfiguration(
+  input: Record<string, unknown>,
+  current?: typeof reportTemplatesTable.$inferSelect,
+) {
+  if ((current && "companyId" in input) || Object.keys(input).some((key) => !REPORT_TEMPLATE_FIELDS.has(key))) {
+    return { valid: false as const, error: "Unsupported report template field" };
+  }
+  const source = current ? { ...current, ...input } : input;
+  const name = parseRequiredText(source.name, 500);
+  if (!name) return { valid: false as const, error: "A valid name is required" };
+  const optionalFields = [
+    "description", "defaultCustomer", "defaultWorkLocation", "defaultWorkPerformed", "defaultSafetyNotes", "defaultNotes",
+  ] as const;
+  const texts: Record<string, string | null> = {};
+  for (const field of optionalFields) {
+    const parsed = parseOptionalText(source[field] === undefined ? null : source[field], 4_000);
+    if (parsed === undefined) return { valid: false as const, error: `${field} is invalid` };
+    texts[field] = parsed;
+  }
+  const parseReference = (field: "defaultCrewId" | "defaultProjectId") => {
+    if (source[field] === undefined || source[field] === null) return null;
+    return parsePositiveId(source[field]);
+  };
+  const defaultCrewId = parseReference("defaultCrewId");
+  const defaultProjectId = parseReference("defaultProjectId");
+  if ((source.defaultCrewId != null && defaultCrewId === null) || (source.defaultProjectId != null && defaultProjectId === null)) {
+    return { valid: false as const, error: "Default crew and project IDs must be valid positive IDs" };
+  }
+  if (source.active !== undefined && typeof source.active !== "boolean") {
+    return { valid: false as const, error: "active must be a boolean" };
+  }
+  const items = normalizeConfiguredTemplateItems(
+    source.laborItems ?? [], source.equipmentItems ?? [], source.materialItems ?? [], false,
+  );
+  if (!items.valid) return items;
+  return {
+    valid: true as const,
+    values: {
+      name, ...texts, defaultCrewId, defaultProjectId,
+      laborItems: items.laborItems, equipmentItems: items.equipmentItems, materialItems: items.materialItems,
+      active: source.active ?? true,
+    },
+  };
+}
+
 // ── Report Templates ──────────────────────────────────────────────────────────
 router.get("/report-templates", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
@@ -135,19 +192,17 @@ router.get("/report-templates", requireAuth, async (req: AuthenticatedRequest, r
 
 router.post("/report-templates", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const { companyId, name, ...rest } = req.body;
-  if (!companyId || !name) { res.status(400).json({ error: "companyId and name required" }); return; }
+  const companyId = parsePositiveId(req.body?.companyId);
+  if (companyId === null) { res.status(400).json({ error: "A valid companyId is required" }); return; }
   const m = await checkAccess(req.clerkUserId, companyId);
-  if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
+  if (!m || !canManageTemplateConfiguration(m.role)) { res.status(403).json({ error: "Forbidden" }); return; }
+  const parsed = parseReportTemplateConfiguration(req.body);
+  if (!parsed.valid) { res.status(400).json({ error: parsed.error }); return; }
+  const referenceError = await validateApplicationReferences(companyId, parsed.values);
+  if (referenceError) { res.status(400).json({ error: referenceError }); return; }
   const [template] = await db.insert(reportTemplatesTable).values({
-    companyId, name, description: rest.description ?? null,
+    companyId, ...parsed.values,
     createdById: req.userId ?? null,
-    defaultCrewId: rest.defaultCrewId ?? null, defaultProjectId: rest.defaultProjectId ?? null,
-    defaultCustomer: rest.defaultCustomer ?? null, defaultWorkLocation: rest.defaultWorkLocation ?? null,
-    defaultWorkPerformed: rest.defaultWorkPerformed ?? null,
-    defaultSafetyNotes: rest.defaultSafetyNotes ?? null, defaultNotes: rest.defaultNotes ?? null,
-    laborItems: rest.laborItems ?? [], equipmentItems: rest.equipmentItems ?? [],
-    materialItems: rest.materialItems ?? [], active: rest.active ?? true,
   }).returning();
   res.status(201).json(fmtTemplate(template));
 });
@@ -159,12 +214,13 @@ router.patch("/report-templates/:id", requireAuth, async (req: AuthenticatedRequ
   const [existing] = await db.select().from(reportTemplatesTable).where(eq(reportTemplatesTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
   const m = await checkAccess(req.clerkUserId, existing.companyId);
-  if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
-  const updates: Record<string, unknown> = {};
-  const fields = ["name","description","defaultCrewId","defaultProjectId","defaultCustomer","defaultWorkLocation",
-    "defaultWorkPerformed","defaultSafetyNotes","defaultNotes","laborItems","equipmentItems","materialItems","active"];
-  for (const f of fields) if (req.body[f] !== undefined) updates[f] = req.body[f];
-  const [updated] = await db.update(reportTemplatesTable).set(updates).where(eq(reportTemplatesTable.id, id)).returning();
+  if (!m || !canManageTemplateConfiguration(m.role)) { res.status(403).json({ error: "Forbidden" }); return; }
+  if (!req.body || Object.keys(req.body).length === 0) { res.status(400).json({ error: "At least one field is required" }); return; }
+  const parsed = parseReportTemplateConfiguration(req.body, existing);
+  if (!parsed.valid) { res.status(400).json({ error: parsed.error }); return; }
+  const referenceError = await validateApplicationReferences(existing.companyId, parsed.values);
+  if (referenceError) { res.status(400).json({ error: referenceError }); return; }
+  const [updated] = await db.update(reportTemplatesTable).set(parsed.values).where(eq(reportTemplatesTable.id, id)).returning();
   res.json(fmtTemplate(updated));
 });
 
@@ -175,7 +231,7 @@ router.delete("/report-templates/:id", requireAuth, async (req: AuthenticatedReq
   const [existing] = await db.select().from(reportTemplatesTable).where(eq(reportTemplatesTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
   const m = await checkAccess(req.clerkUserId, existing.companyId);
-  if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
+  if (!m || !canManageTemplateConfiguration(m.role)) { res.status(403).json({ error: "Forbidden" }); return; }
   await db.delete(reportTemplatesTable).where(eq(reportTemplatesTable.id, id));
   res.sendStatus(204);
 });
@@ -418,6 +474,49 @@ function fmtWP(w: typeof workPackageTemplatesTable.$inferSelect) {
   };
 }
 
+const WORK_PACKAGE_FIELDS = new Set([
+  "companyId", "name", "description", "billingCode", "laborItems", "equipmentItems", "materialItems",
+  "safetyChecklist", "requiredDocumentation", "defaultNotes", "active",
+]);
+
+function parseWorkPackageConfiguration(
+  input: Record<string, unknown>,
+  current?: typeof workPackageTemplatesTable.$inferSelect,
+) {
+  if ((current && "companyId" in input) || Object.keys(input).some((key) => !WORK_PACKAGE_FIELDS.has(key))) {
+    return { valid: false as const, error: "Unsupported work package field" };
+  }
+  const source = current ? { ...current, ...input } : input;
+  const name = parseRequiredText(source.name, 500);
+  if (!name) return { valid: false as const, error: "A valid name is required" };
+  const description = parseOptionalText(source.description === undefined ? null : source.description, 4_000);
+  const billingCode = parseOptionalText(source.billingCode === undefined ? null : source.billingCode, 200);
+  const defaultNotes = parseOptionalText(source.defaultNotes === undefined ? null : source.defaultNotes, 4_000);
+  if (description === undefined || billingCode === undefined || defaultNotes === undefined) {
+    return { valid: false as const, error: "Description, billing code, or notes are invalid" };
+  }
+  if (source.active !== undefined && typeof source.active !== "boolean") {
+    return { valid: false as const, error: "active must be a boolean" };
+  }
+  const items = normalizeConfiguredTemplateItems(
+    source.laborItems ?? [], source.equipmentItems ?? [], source.materialItems ?? [], true,
+  );
+  if (!items.valid) return items;
+  const safetyChecklist = normalizeTemplateChecklist(source.safetyChecklist ?? [], "safetyChecklist");
+  if (!safetyChecklist.valid) return safetyChecklist;
+  const requiredDocumentation = normalizeTemplateChecklist(source.requiredDocumentation ?? [], "requiredDocumentation");
+  if (!requiredDocumentation.valid) return requiredDocumentation;
+  return {
+    valid: true as const,
+    values: {
+      name, description, billingCode, defaultNotes,
+      laborItems: items.laborItems, equipmentItems: items.equipmentItems, materialItems: items.materialItems,
+      safetyChecklist: safetyChecklist.items, requiredDocumentation: requiredDocumentation.items,
+      active: source.active ?? true,
+    },
+  };
+}
+
 router.get("/work-package-templates", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
   const companyId = parsePositiveId(req.query.companyId);
@@ -430,17 +529,16 @@ router.get("/work-package-templates", requireAuth, async (req: AuthenticatedRequ
 
 router.post("/work-package-templates", requireAuth, async (req: AuthenticatedRequest, res): Promise<void> => {
   if (!req.clerkUserId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const { companyId, name, ...rest } = req.body;
-  if (!companyId || !name) { res.status(400).json({ error: "companyId and name required" }); return; }
+  const companyId = parsePositiveId(req.body?.companyId);
+  if (companyId === null) { res.status(400).json({ error: "A valid companyId is required" }); return; }
   const m = await checkAccess(req.clerkUserId, companyId);
-  if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
+  if (!m || !canManageTemplateConfiguration(m.role)) { res.status(403).json({ error: "Forbidden" }); return; }
+  const parsed = parseWorkPackageConfiguration(req.body);
+  if (!parsed.valid) { res.status(400).json({ error: parsed.error }); return; }
+  const referenceError = await validateApplicationReferences(companyId, parsed.values);
+  if (referenceError) { res.status(400).json({ error: referenceError }); return; }
   const [wp] = await db.insert(workPackageTemplatesTable).values({
-    companyId, name, description: rest.description ?? null,
-    createdById: req.userId ?? null, billingCode: rest.billingCode ?? null,
-    laborItems: rest.laborItems ?? [], equipmentItems: rest.equipmentItems ?? [],
-    materialItems: rest.materialItems ?? [], safetyChecklist: rest.safetyChecklist ?? [],
-    requiredDocumentation: rest.requiredDocumentation ?? [],
-    defaultNotes: rest.defaultNotes ?? null, active: rest.active ?? true,
+    companyId, ...parsed.values, createdById: req.userId ?? null,
   }).returning();
   res.status(201).json(fmtWP(wp));
 });
@@ -452,12 +550,13 @@ router.patch("/work-package-templates/:id", requireAuth, async (req: Authenticat
   const [existing] = await db.select().from(workPackageTemplatesTable).where(eq(workPackageTemplatesTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
   const m = await checkAccess(req.clerkUserId, existing.companyId);
-  if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
-  const updates: Record<string, unknown> = {};
-  const fields = ["name","description","billingCode","laborItems","equipmentItems","materialItems",
-    "safetyChecklist","requiredDocumentation","defaultNotes","active"];
-  for (const f of fields) if (req.body[f] !== undefined) updates[f] = req.body[f];
-  const [updated] = await db.update(workPackageTemplatesTable).set(updates).where(eq(workPackageTemplatesTable.id, id)).returning();
+  if (!m || !canManageTemplateConfiguration(m.role)) { res.status(403).json({ error: "Forbidden" }); return; }
+  if (!req.body || Object.keys(req.body).length === 0) { res.status(400).json({ error: "At least one field is required" }); return; }
+  const parsed = parseWorkPackageConfiguration(req.body, existing);
+  if (!parsed.valid) { res.status(400).json({ error: parsed.error }); return; }
+  const referenceError = await validateApplicationReferences(existing.companyId, parsed.values);
+  if (referenceError) { res.status(400).json({ error: referenceError }); return; }
+  const [updated] = await db.update(workPackageTemplatesTable).set(parsed.values).where(eq(workPackageTemplatesTable.id, id)).returning();
   res.json(fmtWP(updated));
 });
 
@@ -468,7 +567,7 @@ router.delete("/work-package-templates/:id", requireAuth, async (req: Authentica
   const [existing] = await db.select().from(workPackageTemplatesTable).where(eq(workPackageTemplatesTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
   const m = await checkAccess(req.clerkUserId, existing.companyId);
-  if (!m) { res.status(403).json({ error: "Forbidden" }); return; }
+  if (!m || !canManageTemplateConfiguration(m.role)) { res.status(403).json({ error: "Forbidden" }); return; }
   await db.delete(workPackageTemplatesTable).where(eq(workPackageTemplatesTable.id, id));
   res.sendStatus(204);
 });

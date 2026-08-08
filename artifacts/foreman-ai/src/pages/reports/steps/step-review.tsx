@@ -3,6 +3,7 @@ import { format } from "date-fns";
 import { CheckCircle2, AlertTriangle } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
+import PoleBillingReview from "../pole-billing-review";
 
 export default function StepReview({ report }: { report: DailyReportDetail }) {
   const queryClient = useQueryClient();
@@ -69,6 +70,8 @@ export default function StepReview({ report }: { report: DailyReportDetail }) {
           </div>
         </div>
       </div>
+
+      <PoleBillingReview reportId={report.id} />
 
       <div className="mt-8 pt-8 border-t border-border">
         <h4 className="text-sm font-bold uppercase tracking-wider mb-4">Foreman Signature</h4>

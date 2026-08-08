@@ -15,12 +15,12 @@ export function useApiQuery<T>(endpoint: string, enabled = true) {
 }
 
 export function useApiMutation<TBody, TResult>(method: 'POST'|'PATCH'|'DELETE'|'PUT', endpoint: string) {
-  return useMutation<TResult, Error, { endpoint?: string; body?: TBody }>({
-    mutationFn: ({ endpoint: overrideEndpoint, body }) => {
+  return useMutation<TResult, Error, { endpoint?: string; body?: TBody; headers?: Record<string, string> }>({
+    mutationFn: ({ endpoint: overrideEndpoint, body, headers }) => {
       const url = `${baseUrl}${overrideEndpoint ?? endpoint}`;
       return fetch(url, {
         method, 
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...headers },
         body: body ? JSON.stringify(body) : undefined,
       }).then(r => {
         if (!r.ok) throw new Error("Network response was not ok");

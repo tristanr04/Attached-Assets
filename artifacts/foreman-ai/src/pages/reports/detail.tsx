@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { format } from "date-fns";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import PoleBillingReview from "./pole-billing-review";
 
 const PHOTO_CATEGORY_LABELS: Record<string, string> = {
   full_pole: "Full Pole", pole_tag: "Pole Tag / Stamp", top_framing: "Top Framing",
@@ -209,6 +210,8 @@ export default function ReportDetailPage({ id }: { id: number }) {
           </div>
         </CollapsibleContent>
       </Collapsible>
+
+      <PoleBillingReview reportId={id} />
 
       {/* Photos */}
       <Collapsible defaultOpen={photos.length > 0} className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">

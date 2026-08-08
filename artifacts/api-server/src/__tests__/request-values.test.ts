@@ -20,8 +20,13 @@ import {
 } from "../lib/reportState";
 import { parseDecimalInput, parseLaborHours } from "../lib/numericInput";
 import { normalizeTemplateItems } from "../lib/templateItems";
-import { applicationLockKey, parseIdempotencyKey } from "../lib/idempotency";
+import { applicationLockKey, parseIdempotencyKey, photoUploadLockKey } from "../lib/idempotency";
 import { canManageCrew } from "../lib/crewAccess";
+import {
+  canManageTemplateConfiguration,
+  normalizeConfiguredTemplateItems,
+  normalizeTemplateChecklist,
+} from "../lib/templateConfiguration";
 import {
   normalizeBillableNumbers,
   parseBillableCategory,
@@ -374,6 +379,10 @@ test("daily report creation uses a stable company, foreman, and date lock key", 
     dailyReportLockKey(4, 12, "2026-08-07"),
     dailyReportLockKey(4, 13, "2026-08-07"),
   );
+  assert.equal(
+    photoUploadLockKey(2, "photo-upload-123"),
+    "pole-photo-upload:2:photo-upload-123",
+  );
 });
 
 test("daily report creation serializes and replays duplicate submissions", async () => {
@@ -418,6 +427,51 @@ test("report completion is idempotent and preserves the first completion time", 
   assert.equal(completionUpdate("complete", original, now), null);
 });
 
+test("report completion serializes with pole confirmation and blocks pending AI proposals", async () => {
+  const source = await readFile(
+    new URL("../routes/reports.ts", import.meta.url),
+    "utf8",
+  );
+  const completionRoute = source.slice(
+    source.indexOf('router.post("/reports/:reportId/complete"'),
+    source.indexOf("// ── Time entries"),
+  );
+
+  assert.match(completionRoute, /db\.transaction/);
+  assert.match(completionRoute, /select id from daily_reports where id = \$\{reportId\} for update/);
+  assert.match(completionRoute, /eq\(poleAnalysisRunsTable\.companyId, current\.companyId\)/);
+  assert.match(completionRoute, /eq\(poleAnalysisRunsTable\.reportId, reportId\)/);
+  assert.match(completionRoute, /eq\(poleAnalysisRunsTable\.status, "ai_proposed"\)/);
+  assert.match(completionRoute, /eq\(poleAnalysisJobsTable\.companyId, current\.companyId\)/);
+  assert.match(completionRoute, /eq\(poleAnalysisJobsTable\.reportId, reportId\)/);
+  assert.match(completionRoute, /\["queued", "processing", "retry_wait"\]/);
+  assert.match(completionRoute, /Review and confirm or reject the pending pole analysis/);
+});
+
+test("photo upload is retry-safe and enqueues analysis atomically", async () => {
+  const source = await readFile(
+    new URL("../routes/reports.ts", import.meta.url),
+    "utf8",
+  );
+  const route = source.slice(
+    source.indexOf('router.post("/reports/:reportId/photos"'),
+    source.indexOf('router.patch("/reports/:reportId/photos/:photoId"'),
+  );
+
+  assert.match(route, /parseIdempotencyKey\(req\.get\("Idempotency-Key"\)\)/);
+  assert.match(route, /photoUploadLockKey\(report\.companyId, idempotencyKey\)/);
+  assert.match(route, /db\.transaction/);
+  assert.match(route, /pg_advisory_xact_lock/);
+  assert.match(route, /select id from daily_reports where id = \$\{reportId\} for update/);
+  assert.match(route, /current\.status === "complete"/);
+  assert.match(route, /eq\(poleAnalysisJobsTable\.companyId, report\.companyId\)/);
+  assert.match(route, /eq\(poleAnalysisJobsTable\.requestKey, idempotencyKey\)/);
+  assert.match(route, /tx\.insert\(photosTable\)/);
+  assert.match(route, /tx\.insert\(poleAnalysisJobsTable\)/);
+  assert.match(route, /Idempotent-Replay/);
+  assert.match(route, /result\.kind === "created" \? 201 : 200/);
+});
+
 test("all report child mutation routes enforce the completion lock", async () => {
   const source = await readFile(
     new URL("../routes/reports.ts", import.meta.url),
@@ -430,7 +484,7 @@ test("all report child mutation routes enforce the completion lock", async () =>
   assert.match(source, /const update = completionUpdate\(/);
   assert.match(
     source,
-    /eq\(dailyReportsTable\.status, report\.status\)/,
+    /eq\(dailyReportsTable\.status, current\.status\)/,
   );
 });
 
@@ -520,7 +574,46 @@ test("template application cannot bypass company-scoped reference checks", async
   ]) {
     assert.match(source, new RegExp(`eq\\(${table}\\.companyId, companyId\\)`));
   }
-  assert.equal(source.match(/validateApplicationReferences\(/g)?.length, 3);
+  assert.equal(source.match(/validateApplicationReferences\(/g)?.length, 7);
+});
+
+test("only managers can configure report templates and work packages", async () => {
+  assert.equal(canManageTemplateConfiguration("admin"), true);
+  assert.equal(canManageTemplateConfiguration("supervisor"), true);
+  assert.equal(canManageTemplateConfiguration("foreman"), false);
+
+  const source = await readFile(new URL("../routes/report-templates.ts", import.meta.url), "utf8");
+  assert.equal(source.match(/!canManageTemplateConfiguration\(m\.role\)/g)?.length, 6);
+  assert.equal(source.match(/const companyId = parsePositiveId\(req\.body\?\.companyId\)/g)?.length, 2);
+});
+
+test("stored template items are bounded, normalized, and reject hidden fields", () => {
+  const valid = normalizeConfiguredTemplateItems(
+    [{ name: " Lineman ", trade: "Line", laborClassificationId: "12", hours: "8.25" }],
+    [{ name: "Bucket", catalogEquipmentId: 3, hours: "4.5", quantity: 1 }],
+    [{ name: "Crossarm", catalogMaterialId: 9, quantity: "2.500", unit: "each" }],
+    true,
+  );
+  assert.equal(valid.valid, true);
+  if (valid.valid) {
+    assert.equal(valid.laborItems[0]?.name, "Lineman");
+    assert.equal(valid.laborItems[0]?.laborClassificationId, 12);
+    assert.equal(valid.laborItems[0]?.hours, "8.25");
+  }
+
+  assert.equal(normalizeConfiguredTemplateItems([{ name: "Lineman", rate: 999 }], [], [], true).valid, false);
+  assert.equal(normalizeConfiguredTemplateItems([{ name: "x".repeat(501) }], [], [], true).valid, false);
+  assert.equal(normalizeConfiguredTemplateItems(new Array(101).fill({ name: "Lineman" }), [], [], true).valid, false);
+  assert.equal(normalizeConfiguredTemplateItems([], [{ name: "Bucket", quantity: 0 }], [], true).valid, false);
+});
+
+test("work-package checklist values are bounded and normalized", () => {
+  assert.deepEqual(normalizeTemplateChecklist(["  Tailboard  ", "Pole photo"], "safetyChecklist"), {
+    valid: true,
+    items: ["Tailboard", "Pole photo"],
+  });
+  assert.equal(normalizeTemplateChecklist([""], "safetyChecklist").valid, false);
+  assert.equal(normalizeTemplateChecklist(new Array(101).fill("item"), "requiredDocumentation").valid, false);
 });
 
 test("template items reject invalid billable quantities before any writes", () => {

@@ -14,3 +14,10 @@ export function applicationLockKey(
 ): string {
   return `${action}:${userId}:${reportId}:${idempotencyKey}`;
 }
+
+export function photoUploadLockKey(
+  companyId: number,
+  idempotencyKey: string,
+): string {
+  return `pole-photo-upload:${companyId}:${idempotencyKey}`;
+}
